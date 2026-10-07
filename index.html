@@ -7,8 +7,6 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <!-- Supabase JS Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- AUTH MODAL (LOGIN) -->
@@ -17,12 +15,12 @@
       <h2>🔐 Вход в BIL Analytics</h2>
       <p>Выберите роль и войдите в аккаунт</p>
       
-      <div class="role-selector">
-        <button class="role-btn active" id="roleStudentBtn" onclick="selectRole('student')">👨‍🎓 Ученик</button>
-        <button class="role-btn" id="roleAdminBtn" onclick="selectRole('admin')">👨‍🏫 Админ / Учитель</button>
-      </div>
-
       <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="role-selector">
+          <button type="button" class="role-btn active" id="roleStudentBtn" onclick="selectRole('student')">👨‍🎓 Ученик</button>
+          <button type="button" class="role-btn" id="roleAdminBtn" onclick="selectRole('admin')">👨‍🏫 Админ / Учитель</button>
+        </div>
+
         <label>Email / Логин</label>
         <input type="email" id="loginEmail" placeholder="student@bil.edu.kz" required value="student@bil.edu.kz">
 
@@ -51,7 +49,6 @@
         <button class="nav-btn active" onclick="switchTab('dashboard', this)">📊 Дашборд</button>
         <button class="nav-btn" onclick="switchTab('bts', this)">📝 БТС & КБО</button>
         <button class="nav-btn" onclick="switchTab('rating', this)">🌐 Общий рейтинг</button>
-        <!-- Показывается только для админа -->
         <button class="nav-btn admin-only" id="adminTabBtn" onclick="switchTab('admin', this)" style="display:none;">⚙️ Админ-панель</button>
       </nav>
 
@@ -104,86 +101,3 @@
           <h3>🎖️ Достижения и Бэйджи</h3>
           <div class="badges-grid">
             <div class="badge-item"><span class="badge-icon">🚀</span><span class="badge-title">Быстрый рост</span></div>
-            <div class="badge-item"><span class="badge-icon">👑</span><span class="badge-title">КБО Гений</span></div>
-            <div class="badge-item"><span class="badge-icon">🔥</span><span class="badge-title">7 дней подряд</span></div>
-            <div class="badge-item locked" id="badge90"><span class="badge-icon">🔒</span><span class="badge-title">БТС 90+</span></div>
-          </div>
-        </div>
-
-        <!-- Analytics Row: Auto Topic Mastery -->
-        <div class="grid-2">
-          <div class="card weak-spots-card">
-            <h3>⚠️ Зоны роста (Авто-анализ тем БИЛ)</h3>
-            <ul class="weak-list" id="weakTopicsList">
-              <!-- Заполняется автоматически из JS -->
-            </ul>
-          </div>
-
-          <div class="card advice-card">
-            <h3>💡 Персональные рекомендации ИИ</h3>
-            <div id="aiRecommendations">
-              <!-- Заполняется динамически -->
-            </div>
-          </div>
-        </div>
-
-        <!-- Progress Chart -->
-        <div class="card chart-card">
-          <h3>📈 Динамика результатов БТС</h3>
-          <canvas id="btsChart"></canvas>
-        </div>
-      </section>
-
-      <!-- BTS TAB -->
-      <section id="bts" class="tab-content">
-        <h2>История сдач БТС / КБО</h2>
-        <ul id="historyList" class="history-list"></ul>
-      </section>
-
-      <!-- RATING TAB -->
-      <section id="rating" class="tab-content">
-        <h2>Общий Рейтинг среди школ БИЛ</h2>
-        <table class="rating-table">
-          <thead>
-            <tr><th>Место</th><th>Имя</th><th>Лицей</th><th>Балл БТС</th></tr>
-          </thead>
-          <tbody id="ratingTableBody">
-            <!-- Динамические данные -->
-          </tbody>
-        </table>
-      </section>
-
-      <!-- ADMIN TAB (Only visible for Admins) -->
-      <section id="admin" class="tab-content">
-        <h2>⚙️ Панель Администратора / Координатора БИЛ</h2>
-        
-        <div class="grid-2">
-          <!-- Form 1: Exam Date Setter -->
-          <div class="card">
-            <h3>📅 Установить дату следующего БТС / КБО</h3>
-            <form onsubmit="handleSetExamDate(event)">
-              <label>Название экзамена</label>
-              <input type="text" id="adminExamTitle" placeholder="БТС-3 (Официальный)" required>
-
-              <label>Дата проведения</label>
-              <input type="date" id="adminExamDate" required>
-
-              <button type="submit" class="btn btn-primary">Опубликовать дату</button>
-            </form>
-          </div>
-
-          <!-- Form 2: Bulk CSV Upload -->
-          <div class="card">
-            <h3>📊 Загрузка ведомости баллов (CSV / Excel)</h3>
-            <p class="hint">Загрузите файл с баллами учеников для автоматического пересчета рейтинга БИЛ.</p>
-            <input type="file" id="csvFileInput" accept=".csv">
-            <button class="btn btn-primary" onclick="handleCSVUpload()" style="margin-top: 12px;">Импортировать и обновить рейтинг</button>
-          </div>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <script src="script.js"></script>
-</body>
-</html>
