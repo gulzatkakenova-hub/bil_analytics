@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BIL Analytics & Rating</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <h2>BIL Analytics</h2>
+      <nav>
+        <button class="nav-btn active" onclick="switchTab('dashboard')">📊 Дашборд</button>
+        <button class="nav-btn" onclick="switchTab('bts')">📝 БТС & КБО</button>
+        <button class="nav-btn" onclick="switchTab('olympiad')">🏆 Олимпиады</button>
+        <button class="nav-btn" onclick="switchTab('rating')">🌐 Общий рейтинг БИЛ</button>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <section id="dashboard" class="tab-content active">
+        <header class="top-header">
+          <h1>Привет, Ученик! 👋</h1>
+          <p>Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
+        </header>
+
+        <div class="cards-grid">
+          <div class="card highlight">
+            <h3>Общий рейтинг</h3>
+            <div class="rank">#12 <span>из 1,200 учеников БИЛ</span></div>
+          </div>
+          <div class="card">
+            <h3>Средний балл БТС</h3>
+            <div class="score">88.5 / 100</div>
+          </div>
+          <div class="card">
+            <h3>КБО статус</h3>
+            <div class="status">Топер (Top 5%)</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card weak-spots-card">
+            <h3>⚠️ Слабые стороны (Зоны роста)</h3>
+            <ul class="weak-list">
+              <li>
+                <span class="tag subject">Химия</span>
+                <span class="topic">Нуклеофильное замещение (БТС-2)</span>
+                <span class="percentage red">42%</span>
+              </li>
+              <li>
+                <span class="tag subject">Математика</span>
+                <span class="topic">Стереометрия & Вероятность (КБО)</span>
+                <span class="percentage orange">58%</span>
+              </li>
+              <li>
+                <span class="tag subject">Биология</span>
+                <span class="topic">Генетические матрицы & ДНК</span>
+                <span class="percentage orange">65%</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card advice-card">
+            <h3>💡 Рекомендации ИИ по бусту рейтинга</h3>
+            <div class="advice-item">
+              <strong>1. Подтяни химию на +8 баллов:</strong>
+              <p>Пройди 2 сессии карточек Anki по механизмам реакций haloalkanes — это поднимет тебя с 12-го на 8-е место в общем рейтинге БИЛ.</p>
+            </div>
+            <div class="advice-item">
+              <strong>2. Практика задач КБО:</strong>
+              <p>Реши 5 задач олимпиадного уровня по геометрии прошлых лет (2023–2025 гг.).</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <h3>📈 Динамика результатов БТС</h3>
+          <canvas id="btsChart"></canvas>
+        </div>
+      </section>
+
+      <section id="bts" class="tab-content">
+        <h2>Результаты БТС и КБО</h2>
+        <p>Раздел в разработке: здесь будет детализация по каждому срез-тесту.</p>
+      </section>
+
+      <section id="olympiad" class="tab-content">
+        <h2>Предметные Олимпиады</h2>
+        <p>Раздел в разработке: сетевые, областные и республиканские олимпиады.</p>
+      </section>
+
+      <section id="rating" class="tab-content">
+        <h2>Общий Рейтинг среди школ БИЛ</h2>
+        <p>Раздел в разработке: сравнение лицеев и лучших учеников.</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
