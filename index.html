@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,23 +9,36 @@
 </head>
 <body>
   <div class="app-container">
+    <!-- Sidebar / Top Header for Mobile -->
     <aside class="sidebar">
-      <h2>BIL Analytics</h2>
-      <nav>
-        <button class="nav-btn active" onclick="switchTab('dashboard')">📊 Дашборд</button>
-        <button class="nav-btn" onclick="switchTab('bts')">📝 БТС & КБО</button>
-        <button class="nav-btn" onclick="switchTab('olympiad')">🏆 Олимпиады</button>
-        <button class="nav-btn" onclick="switchTab('rating')">🌐 Общий рейтинг БИЛ</button>
+      <div class="brand">
+        <h2>BIL Analytics</h2>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Переключить тему">🌙</button>
+      </div>
+      <nav class="desktop-nav">
+        <button class="nav-btn active" onclick="switchTab('dashboard', this)">📊 Дашборд</button>
+        <button class="nav-btn" onclick="switchTab('bts', this)">📝 БТС & КБО</button>
+        <button class="nav-btn" onclick="switchTab('olympiad', this)">🏆 Олимпиады</button>
+        <button class="nav-btn" onclick="switchTab('rating', this)">🌐 Общий рейтинг</button>
       </nav>
     </aside>
 
+    <!-- Main Content -->
     <main class="content">
+      <!-- DASHBOARD TAB -->
       <section id="dashboard" class="tab-content active">
         <header class="top-header">
-          <h1>Привет, Ученик! 👋</h1>
-          <p>Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
+          <div>
+            <h1>Привет, Ученик! 👋</h1>
+            <p>Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
+          </div>
+          <!-- Gamification Banner -->
+          <div class="streak-badge">
+            🔥 <span>7 дней</span> подряд подготовки!
+          </div>
         </header>
 
+        <!-- Stats Cards -->
         <div class="cards-grid">
           <div class="card highlight">
             <h3>Общий рейтинг</h3>
@@ -41,7 +54,32 @@
           </div>
         </div>
 
+        <!-- Badges / Achievements -->
+        <div class="card badges-card">
+          <h3>🎖️ Достижения и Бэйджи</h3>
+          <div class="badges-grid">
+            <div class="badge-item" title="+10 баллов за последний месяц">
+              <span class="badge-icon">🚀</span>
+              <span class="badge-title">Быстрый рост</span>
+            </div>
+            <div class="badge-item" title="Входит в Top 5% по КБО">
+              <span class="badge-icon">👑</span>
+              <span class="badge-title">КБО Гений</span>
+            </div>
+            <div class="badge-item" title="7 дней активных занятий">
+              <span class="badge-icon">🔥</span>
+              <span class="badge-title">В ритме</span>
+            </div>
+            <div class="badge-item locked" title="Набери 90+ баллов на БТС">
+              <span class="badge-icon">🔒</span>
+              <span class="badge-title">БТС 90+</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analytics Row -->
         <div class="grid-2">
+          <!-- Weak Points Section -->
           <div class="card weak-spots-card">
             <h3>⚠️ Слабые стороны (Зоны роста)</h3>
             <ul class="weak-list">
@@ -63,6 +101,7 @@
             </ul>
           </div>
 
+          <!-- Recommendations Section -->
           <div class="card advice-card">
             <h3>💡 Рекомендации ИИ по бусту рейтинга</h3>
             <div class="advice-item">
@@ -76,28 +115,52 @@
           </div>
         </div>
 
+        <!-- Progress Chart -->
         <div class="card chart-card">
           <h3>📈 Динамика результатов БТС</h3>
           <canvas id="btsChart"></canvas>
         </div>
       </section>
 
+      <!-- BTS TAB -->
       <section id="bts" class="tab-content">
         <h2>Результаты БТС и КБО</h2>
-        <p>Раздел в разработке: здесь будет детализация по каждому срез-тесту.</p>
+        <p>Раздел в разработке: детализация по каждому срез-тесту.</p>
       </section>
 
+      <!-- OLYMPIAD TAB -->
       <section id="olympiad" class="tab-content">
         <h2>Предметные Олимпиады</h2>
         <p>Раздел в разработке: сетевые, областные и республиканские олимпиады.</p>
       </section>
 
+      <!-- RATING TAB -->
       <section id="rating" class="tab-content">
         <h2>Общий Рейтинг среди школ БИЛ</h2>
         <p>Раздел в разработке: сравнение лицеев и лучших учеников.</p>
       </section>
     </main>
   </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-nav">
+    <button class="mobile-nav-btn active" onclick="switchTab('dashboard', this)">
+      <span>📊</span>
+      <small>Дашборд</small>
+    </button>
+    <button class="mobile-nav-btn" onclick="switchTab('bts', this)">
+      <span>📝</span>
+      <small>БТС</small>
+    </button>
+    <button class="mobile-nav-btn" onclick="switchTab('olympiad', this)">
+      <span>🏆</span>
+      <small>Олимпиады</small>
+    </button>
+    <button class="mobile-nav-btn" onclick="switchTab('rating', this)">
+      <span>🌐</span>
+      <small>Рейтинг</small>
+    </button>
+  </nav>
 
   <script src="script.js"></script>
 </body>
