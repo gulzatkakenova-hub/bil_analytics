@@ -6,9 +6,11 @@
   <title>BIL Analytics & Rating</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- html2pdf для экспорта отчёта -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
-  <div class="app-container">
+  <div class="app-container" id="reportArea">
     <!-- Sidebar / Top Header for Mobile -->
     <aside class="sidebar">
       <div class="brand">
@@ -32,9 +34,9 @@
             <h1>Привет, Ученик! 👋</h1>
             <p>Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
           </div>
-          <!-- Gamification Banner -->
-          <div class="streak-badge">
-            🔥 <span>7 дней</span> подряд подготовки!
+          <div class="header-actions">
+            <button class="btn btn-secondary" onclick="exportPDF()">📄 Скачать PDF</button>
+            <button class="btn btn-primary" onclick="openModal()">➕ Добавить балл</button>
           </div>
         </header>
 
@@ -45,8 +47,8 @@
             <div class="rank">#12 <span>из 1,200 учеников БИЛ</span></div>
           </div>
           <div class="card">
-            <h3>Средний балл БТС</h3>
-            <div class="score">88.5 / 100</div>
+            <h3>Последний балл БТС</h3>
+            <div class="score" id="latestScore">88.5 / 100</div>
           </div>
           <div class="card">
             <h3>КБО статус</h3>
@@ -70,7 +72,7 @@
               <span class="badge-icon">🔥</span>
               <span class="badge-title">В ритме</span>
             </div>
-            <div class="badge-item locked" title="Набери 90+ баллов на БТС">
+            <div class="badge-item locked" id="badge90" title="Набери 90+ баллов на БТС">
               <span class="badge-icon">🔒</span>
               <span class="badge-title">БТС 90+</span>
             </div>
@@ -85,12 +87,12 @@
             <ul class="weak-list">
               <li>
                 <span class="tag subject">Химия</span>
-                <span class="topic">Нуклеофильное замещение (БТС-2)</span>
+                <span class="topic">Нуклеофильное замещение</span>
                 <span class="percentage red">42%</span>
               </li>
               <li>
                 <span class="tag subject">Математика</span>
-                <span class="topic">Стереометрия & Вероятность (КБО)</span>
+                <span class="topic">Стереометрия & Вероятность</span>
                 <span class="percentage orange">58%</span>
               </li>
               <li>
@@ -124,8 +126,8 @@
 
       <!-- BTS TAB -->
       <section id="bts" class="tab-content">
-        <h2>Результаты БТС и КБО</h2>
-        <p>Раздел в разработке: детализация по каждому срез-тесту.</p>
+        <h2>История сдач БТС</h2>
+        <ul id="historyList" class="history-list"></ul>
       </section>
 
       <!-- OLYMPIAD TAB -->
@@ -140,6 +142,25 @@
         <p>Раздел в разработке: сравнение лицеев и лучших учеников.</p>
       </section>
     </main>
+  </div>
+
+  <!-- Modal for Adding Score -->
+  <div class="modal-overlay" id="scoreModal">
+    <div class="modal-card">
+      <h3>➕ Добавить результат БТС</h3>
+      <form id="scoreForm" onsubmit="saveScore(event)">
+        <label>Название среза</label>
+        <input type="text" id="btsName" placeholder="Например: БТС-5 (Май)" required>
+
+        <label>Результат (баллы)</label>
+        <input type="number" id="btsScore" min="0" max="100" step="0.5" placeholder="Например: 91.5" required>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- Mobile Bottom Navigation Bar -->
