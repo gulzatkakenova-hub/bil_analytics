@@ -10,18 +10,23 @@
 </head>
 <body>
 
-  <!-- AUTH MODAL (Спрятано по умолчанию, чтобы не блокировать вход) -->
-  <div class="modal-overlay" id="authModal" style="display: none;">
+  <!-- AUTH MODAL -->
+  <div class="modal-overlay active" id="authModal">
     <div class="modal-card auth-card">
       <h2>🔐 Авторизация BIL Analytics</h2>
-      <p>Выберите роль для тестирования:</p>
+      <p>Выберите роль для входа в систему:</p>
       
       <div class="role-selector">
         <button type="button" class="role-btn active" id="roleStudentBtn" onclick="selectRole('student')">👨‍🎓 Ученик</button>
         <button type="button" class="role-btn" id="roleAdminBtn" onclick="selectRole('admin')">👨‍🏫 Админ / Учитель</button>
       </div>
 
-      <button type="button" class="btn btn-primary full-width" onclick="closeModal()">Войти</button>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="loginEmail" value="student@bil.edu.kz" readonly>
+      </div>
+
+      <button type="button" class="btn btn-primary full-width" onclick="confirmLogin()">🚀 Войти в аккаунт</button>
     </div>
   </div>
 
@@ -34,7 +39,7 @@
       </div>
       
       <div class="user-profile-badge">
-        <span class="user-role-tag" id="userRoleTag">Студент</span>
+        <span class="user-role-tag" id="userRoleTag">Ученик</span>
         <span class="user-email" id="userEmailTag">student@bil.edu.kz</span>
       </div>
 
@@ -42,10 +47,11 @@
         <button class="nav-btn active" onclick="switchTab('dashboard', this)">📊 Дашборд</button>
         <button class="nav-btn" onclick="switchTab('bts', this)">📝 БТС & КБО</button>
         <button class="nav-btn" onclick="switchTab('rating', this)">🌐 Общий рейтинг</button>
-        <button class="nav-btn" id="adminTabBtn" onclick="switchTab('admin', this)">⚙️ Админ-панель</button>
+        <!-- Кнопка админа по умолчанию СКРЫТА -->
+        <button class="nav-btn admin-only" id="adminTabBtn" onclick="switchTab('admin', this)" style="display: none;">⚙️ Админ-панель</button>
       </nav>
 
-      <button class="btn btn-secondary logout-btn" onclick="openAuthModal()">🔑 Сменить роль</button>
+      <button class="btn btn-secondary logout-btn" onclick="openAuthModal()">🔑 Сменить аккаунт</button>
     </aside>
 
     <!-- Main Content -->
@@ -54,7 +60,7 @@
       <section id="dashboard" class="tab-content active">
         <header class="top-header">
           <div>
-            <h1>Привет, Ученик! 👋</h1>
+            <h1>Привет, <span id="welcomeName">Ученик</span>! 👋</h1>
             <p>Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
           </div>
           <div class="header-actions">
@@ -89,21 +95,10 @@
           </div>
         </div>
 
-        <!-- Badges -->
-        <div class="card badges-card">
-          <h3>🎖️ Достижения и Бэйджи</h3>
-          <div class="badges-grid">
-            <div class="badge-item"><span class="badge-icon">🚀</span><span class="badge-title">Быстрый рост</span></div>
-            <div class="badge-item"><span class="badge-icon">👑</span><span class="badge-title">КБО Гений</span></div>
-            <div class="badge-item"><span class="badge-icon">🔥</span><span class="badge-title">7 дней подряд</span></div>
-            <div class="badge-item locked" id="badge90"><span class="badge-icon">🔒</span><span class="badge-title">БТС 90+</span></div>
-          </div>
-        </div>
-
         <!-- Analytics Row: Auto Topic Mastery -->
         <div class="grid-2">
           <div class="card weak-spots-card">
-            <h3>⚠️ Зоны роста (Авто-анализ тем БИЛ)</h3>
+            <h3>⚠️ Зоны роста (Анализ тем ученика)</h3>
             <ul class="weak-list" id="weakTopicsList"></ul>
           </div>
 
@@ -141,13 +136,14 @@
         </table>
       </section>
 
-      <!-- ADMIN TAB -->
+      <!-- ADMIN TAB (Только для роли Admin) -->
       <section id="admin" class="tab-content">
         <h2>⚙️ Панель Администратора / Координатора БИЛ</h2>
+        <p class="hint" style="margin-bottom: 20px;">Здесь вы можете управлять датами экзаменов и спецификациями тем для всех учеников лицея.</p>
         
         <div class="grid-2">
           <div class="card">
-            <h3>📅 Установить дату следующего БТС / КБО</h3>
+            <h3>📅 Установить официальную дату БТС / КБО</h3>
             <div class="form-group">
               <label>Название экзамена</label>
               <input type="text" id="adminExamTitle" placeholder="БТС-3 (Официальный)">
@@ -158,14 +154,15 @@
               <input type="date" id="adminExamDate">
             </div>
 
-            <button type="button" class="btn btn-primary" onclick="handleSetExamDate()" style="margin-top: 12px;">Опубликовать дату</button>
+            <button type="button" class="btn btn-primary" onclick="handleSetExamDate()" style="margin-top: 12px;">Опубликовать дату для всех БИЛ</button>
           </div>
 
           <div class="card">
-            <h3>📊 Загрузка ведомости баллов (CSV / Excel)</h3>
-            <p class="hint">Загрузите файл с баллами учеников для автоматического пересчета рейтинга БИЛ.</p>
-            <input type="file" id="csvFileInput" accept=".csv">
-            <button type="button" class="btn btn-primary" onclick="handleCSVUpload()" style="margin-top: 12px;">Импортировать и обновить рейтинг</button>
+            <h3>📘 Управление темами и спецификацией</h3>
+            <p class="hint">Добавьте тему в каталог зон роста для 10 класса:</p>
+            <input type="text" id="newSubjectInput" placeholder="Предмет (например: Химия)" style="margin-bottom: 8px;">
+            <input type="text" id="newTopicInput" placeholder="Тема (например: Галогеноалканы)" style="margin-bottom: 8px;">
+            <button type="button" class="btn btn-primary" onclick="addNewTopicByAdmin()">Добавить тему в систему</button>
           </div>
         </div>
       </section>
