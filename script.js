@@ -1,7 +1,8 @@
+let currentUserRole = 'student'; // 'student' или 'admin'
 let currentExamDate = '2027-01-15';
 let currentExamTitle = 'БТС-3 (Официальный)';
 
-const bilTopicsMastery = [
+let bilTopicsMastery = [
   { subject: 'Химия', topic: 'Нуклеофильное замещение (Haloalkanes)', score: 42, recommendation: 'Пройди карточки Anki по механизмам SN1/SN2 реакций.' },
   { subject: 'Математика', topic: 'Стереометрия & Вероятность', score: 58, recommendation: 'Реши 5 олимпиадных задач КБО 2024–2025 гг.' },
   { subject: 'Биология', topic: 'Генетические матрицы & ДНК', score: 65, recommendation: 'Повтори тему Репликация ДНК из учебника CLIL.' },
@@ -21,22 +22,46 @@ window.onload = function() {
   startCountdown();
 };
 
+// Выбор роли в модальном окне
 function selectRole(role) {
+  currentUserRole = role;
   const studentBtn = document.getElementById('roleStudentBtn');
   const adminBtn = document.getElementById('roleAdminBtn');
-  const roleTag = document.getElementById('userRoleTag');
-  const emailTag = document.getElementById('userEmailTag');
+  const emailInput = document.getElementById('loginEmail');
 
   if (role === 'admin') {
-    if (studentBtn) studentBtn.classList.remove('active');
-    if (adminBtn) adminBtn.classList.add('active');
-    if (roleTag) roleTag.innerText = 'Администратор';
-    if (emailTag) emailTag.innerText = 'admin@bil.edu.kz';
+    studentBtn.classList.remove('active');
+    adminBtn.classList.add('active');
+    emailInput.value = 'admin@bil.edu.kz';
   } else {
-    if (adminBtn) adminBtn.classList.remove('active');
-    if (studentBtn) studentBtn.classList.add('active');
-    if (roleTag) roleTag.innerText = 'Студент';
-    if (emailTag) emailTag.innerText = 'student@bil.edu.kz';
+    adminBtn.classList.remove('active');
+    studentBtn.classList.add('active');
+    emailInput.value = 'student@bil.edu.kz';
+  }
+}
+
+// Подтверждение входа
+function confirmLogin() {
+  document.getElementById('authModal').style.display = 'none';
+  
+  const roleTag = document.getElementById('userRoleTag');
+  const emailTag = document.getElementById('userEmailTag');
+  const adminTabBtn = document.getElementById('adminTabBtn');
+  const welcomeName = document.getElementById('welcomeName');
+
+  if (currentUserRole === 'admin') {
+    roleTag.innerText = 'Администратор';
+    emailTag.innerText = 'admin@bil.edu.kz';
+    welcomeName.innerText = 'Учитель / Админ';
+    // Показываем кнопку админки только для Администратора
+    adminTabBtn.style.display = 'block';
+  } else {
+    roleTag.innerText = 'Ученик';
+    emailTag.innerText = 'student@bil.edu.kz';
+    welcomeName.innerText = 'Ученик';
+    // Скрываем админку от ученика
+    adminTabBtn.style.display = 'none';
+    switchTab('dashboard'); // Переключаем ученика на дашборд
   }
 }
 
@@ -44,8 +69,53 @@ function openAuthModal() {
   document.getElementById('authModal').style.display = 'flex';
 }
 
-function closeModal() {
-  document.getElementById('authModal').style.display = 'none';
+// ПРОВЕРКА ПРАВ: Публикация даты только администратором
+function handleSetExamDate() {
+  if (currentUserRole !== 'admin') {
+    alert('❌ Ошибка доступа: Изменять даты экзаменов может только Администрация БИЛ!');
+    return;
+  }
+
+  const title = document.getElementById('adminExamTitle').value;
+  const date = document.getElementById('adminExamDate').value;
+
+  if (!title || !date) {
+    alert('Пожалуйста, укажите и название, и дату!');
+    return;
+  }
+
+  currentExamTitle = title;
+  currentExamDate = date;
+
+  document.getElementById('nextExamTitle').innerText = currentExamTitle;
+  document.getElementById('nextExamDate').innerText = currentExamDate;
+  alert('✅ Официальная дата БТС успешно опубликована для всех учеников!');
+}
+
+// ПРОВЕРКА ПРАВ: Добавление темы администратором
+function addNewTopicByAdmin() {
+  if (currentUserRole !== 'admin') {
+    alert('❌ Ошибка доступа: Добавлять темы спецификации может только Администратор!');
+    return;
+  }
+
+  const subject = document.getElementById('newSubjectInput').value;
+  const topic = document.getElementById('newTopicInput').value;
+
+  if (!subject || !topic) {
+    alert('Заполните предмет и тему!');
+    return;
+  }
+
+  bilTopicsMastery.push({
+    subject: subject,
+    topic: topic,
+    score: 50,
+    recommendation: 'Новая тема, добавленная администратором БИЛ.'
+  });
+
+  renderTopicsAndRecommendations();
+  alert('✅ Тема успешно добавлена в учебный план учеников!');
 }
 
 function renderTopicsAndRecommendations() {
@@ -104,34 +174,6 @@ function startCountdown() {
       if (hElem) hElem.innerText = hours < 10 ? '0' + hours : hours;
     }
   }, 1000);
-}
-
-function handleSetExamDate() {
-  const title = document.getElementById('adminExamTitle').value;
-  const date = document.getElementById('adminExamDate').value;
-
-  if (!title || !date) {
-    alert('Пожалуйста, укажите и название, и дату!');
-    return;
-  }
-
-  currentExamTitle = title;
-  currentExamDate = date;
-
-  document.getElementById('nextExamTitle').innerText = currentExamTitle;
-  document.getElementById('nextExamDate').innerText = currentExamDate;
-  alert('Даты экзаменов успешно опубликованы!');
-}
-
-function handleCSVUpload() {
-  const fileInput = document.getElementById('csvFileInput');
-  if (!fileInput || !fileInput.files.length) {
-    alert('Пожалуйста, выберите CSV-файл с баллами!');
-    return;
-  }
-  alert('Файл ведомости успешно обработан! Общий рейтинг БИЛ обновлен.');
-  globalRating[2].score = 91.5;
-  renderRatingTable();
 }
 
 function switchTab(tabId, element) {
