@@ -9,34 +9,19 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
-  <!-- AUTH MODAL (LOGIN) -->
-  <div class="modal-overlay active" id="authModal">
+
+  <!-- AUTH MODAL (Спрятано по умолчанию, чтобы не блокировать вход) -->
+  <div class="modal-overlay" id="authModal" style="display: none;">
     <div class="modal-card auth-card">
-      <h2>🔐 Вход в BIL Analytics</h2>
-      <p>Выберите роль и нажмите войти</p>
+      <h2>🔐 Авторизация BIL Analytics</h2>
+      <p>Выберите роль для тестирования:</p>
       
       <div class="role-selector">
         <button type="button" class="role-btn active" id="roleStudentBtn" onclick="selectRole('student')">👨‍🎓 Ученик</button>
         <button type="button" class="role-btn" id="roleAdminBtn" onclick="selectRole('admin')">👨‍🏫 Админ / Учитель</button>
       </div>
 
-      <div class="form-group">
-        <label>Email / Логин</label>
-        <input type="email" id="loginEmail" value="student@bil.edu.kz">
-      </div>
-
-      <div class="form-group">
-        <label>Пароль</label>
-        <input type="password" id="loginPassword" value="123456">
-      </div>
-
-      <button type="button" class="btn btn-primary full-width" onclick="forceLogin()">🚀 Войти в портал</button>
-      
-      <div style="text-align: center; margin-top: 15px;">
-        <a href="#" onclick="closeAuthModalDirectly()" style="color: var(--primary); font-size: 13px; text-decoration: underline;">
-          ⚡ Войти без пароля (Быстрый демо-вход)
-        </a>
-      </div>
+      <button type="button" class="btn btn-primary full-width" onclick="closeModal()">Войти</button>
     </div>
   </div>
 
@@ -45,7 +30,7 @@
     <aside class="sidebar">
       <div class="brand">
         <h2>BIL Analytics</h2>
-        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Переключить тему">🌙</button>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
       </div>
       
       <div class="user-profile-badge">
@@ -57,10 +42,10 @@
         <button class="nav-btn active" onclick="switchTab('dashboard', this)">📊 Дашборд</button>
         <button class="nav-btn" onclick="switchTab('bts', this)">📝 БТС & КБО</button>
         <button class="nav-btn" onclick="switchTab('rating', this)">🌐 Общий рейтинг</button>
-        <button class="nav-btn admin-only" id="adminTabBtn" onclick="switchTab('admin', this)" style="display:none;">⚙️ Админ-панель</button>
+        <button class="nav-btn" id="adminTabBtn" onclick="switchTab('admin', this)">⚙️ Админ-панель</button>
       </nav>
 
-      <button class="btn btn-secondary logout-btn" onclick="handleLogout()">🚪 Выйти</button>
+      <button class="btn btn-secondary logout-btn" onclick="openAuthModal()">🔑 Сменить роль</button>
     </aside>
 
     <!-- Main Content -->
@@ -69,7 +54,7 @@
       <section id="dashboard" class="tab-content active">
         <header class="top-header">
           <div>
-            <h1>Привет, <span id="studentName">Ученик</span>! 👋</h1>
+            <h1>Привет, Ученик! 👋</h1>
             <p>Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
           </div>
           <div class="header-actions">
@@ -138,7 +123,11 @@
       <!-- BTS TAB -->
       <section id="bts" class="tab-content">
         <h2>История сдач БТС / КБО</h2>
-        <ul id="historyList" class="history-list"></ul>
+        <ul id="historyList" class="history-list">
+          <li><strong>БТС-1:</strong> 78/100</li>
+          <li><strong>БТС-2:</strong> 82/100</li>
+          <li><strong>БТС-3:</strong> 88.5/100</li>
+        </ul>
       </section>
 
       <!-- RATING TAB -->
