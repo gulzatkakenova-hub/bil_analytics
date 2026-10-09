@@ -1,25 +1,11 @@
-// CONFIG: Supabase Initialization (замените на свои ключи из Supabase Dashboard при необходимости)
-const SUPABASE_URL = "https://your-supabase-project.supabase.co";
-const SUPABASE_ANON_KEY = "your-anon-key";
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
-
-// STATE
-let currentUser = { role: 'student', email: 'student@bil.edu.kz' };
 let currentExamDate = '2027-01-15';
 let currentExamTitle = 'БТС-3 (Официальный)';
 
-// 10th Grade BIL Topic Registry (Справочник тем БИЛ)
 const bilTopicsMastery = [
   { subject: 'Химия', topic: 'Нуклеофильное замещение (Haloalkanes)', score: 42, recommendation: 'Пройди карточки Anki по механизмам SN1/SN2 реакций.' },
   { subject: 'Математика', topic: 'Стереометрия & Вероятность', score: 58, recommendation: 'Реши 5 олимпиадных задач КБО 2024–2025 гг.' },
   { subject: 'Биология', topic: 'Генетические матрицы & ДНК', score: 65, recommendation: 'Повтори тему Репликация ДНК из учебника CLIL.' },
   { subject: 'ЕНТ География', topic: 'ГИС & Пространственный анализ', score: 71, recommendation: 'Просмотри видеоурок по определению топографических масштабов.' }
-];
-
-let studentBtsHistory = [
-  { name: 'БТС-1 (Сент)', score: 78 },
-  { name: 'БТС-2 (Ноябрь)', score: 82 },
-  { name: 'БТС-3 (Январь)', score: 88.5 }
 ];
 
 let globalRating = [
@@ -28,46 +14,45 @@ let globalRating = [
   { rank: 12, name: 'Вы (Ученик)', school: 'Караганда БИЛ', score: 88.5 }
 ];
 
-// INIT
-document.addEventListener('DOMContentLoaded', () => {
+window.onload = function() {
   renderTopicsAndRecommendations();
   renderRatingTable();
   initChart();
   startCountdown();
-});
+};
 
-// ROLE SELECTION
 function selectRole(role) {
-  currentUser.role = role;
-  document.getElementById('roleStudentBtn').classList.toggle('active', role === 'student');
-  document.getElementById('roleAdminBtn').classList.toggle('active', role === 'admin');
-  document.getElementById('loginEmail').value = role === 'admin' ? 'admin@bil.edu.kz' : 'student@bil.edu.kz';
-}
+  const studentBtn = document.getElementById('roleStudentBtn');
+  const adminBtn = document.getElementById('roleAdminBtn');
+  const roleTag = document.getElementById('userRoleTag');
+  const emailTag = document.getElementById('userEmailTag');
 
-function handleLogin(e) {
-  e.preventDefault();
-  currentUser.email = document.getElementById('loginEmail').value;
-  
-  document.getElementById('authModal').classList.remove('active');
-  document.getElementById('userRoleTag').innerText = currentUser.role === 'admin' ? 'Администратор' : 'Студент';
-  document.getElementById('userEmailTag').innerText = currentUser.email;
-
-  // Show Admin tab if admin
-  if (currentUser.role === 'admin') {
-    document.getElementById('adminTabBtn').style.display = 'block';
+  if (role === 'admin') {
+    if (studentBtn) studentBtn.classList.remove('active');
+    if (adminBtn) adminBtn.classList.add('active');
+    if (roleTag) roleTag.innerText = 'Администратор';
+    if (emailTag) emailTag.innerText = 'admin@bil.edu.kz';
   } else {
-    document.getElementById('adminTabBtn').style.display = 'none';
+    if (adminBtn) adminBtn.classList.remove('active');
+    if (studentBtn) studentBtn.classList.add('active');
+    if (roleTag) roleTag.innerText = 'Студент';
+    if (emailTag) emailTag.innerText = 'student@bil.edu.kz';
   }
 }
 
-function handleLogout() {
-  document.getElementById('authModal').classList.add('active');
+function openAuthModal() {
+  document.getElementById('authModal').style.display = 'flex';
 }
 
-// RENDER TOPICS & AI RECOMMENDATIONS
+function closeModal() {
+  document.getElementById('authModal').style.display = 'none';
+}
+
 function renderTopicsAndRecommendations() {
   const topicsList = document.getElementById('weakTopicsList');
   const adviceBox = document.getElementById('aiRecommendations');
+
+  if (!topicsList || !adviceBox) return;
 
   topicsList.innerHTML = '';
   adviceBox.innerHTML = '';
@@ -91,9 +76,9 @@ function renderTopicsAndRecommendations() {
   });
 }
 
-// RENDER RATING TABLE
 function renderRatingTable() {
   const tbody = document.getElementById('ratingTableBody');
+  if (!tbody) return;
   tbody.innerHTML = globalRating.map(row => `
     <tr ${row.rank === 12 ? 'style="font-weight:bold; background: rgba(79,70,229,0.1);"' : ''}>
       <td>#${row.rank}</td>
@@ -104,7 +89,6 @@ function renderRatingTable() {
   `).join('');
 }
 
-// COUNTDOWN TIMER
 function startCountdown() {
   setInterval(() => {
     const target = new Date(currentExamDate).getTime();
@@ -114,55 +98,61 @@ function startCountdown() {
     if (diff > 0) {
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      document.getElementById('countdownDays').innerText = days < 10 ? '0' + days : days;
-      document.getElementById('countdownHours').innerText = hours < 10 ? '0' + hours : hours;
+      const dElem = document.getElementById('countdownDays');
+      const hElem = document.getElementById('countdownHours');
+      if (dElem) dElem.innerText = days < 10 ? '0' + days : days;
+      if (hElem) hElem.innerText = hours < 10 ? '0' + hours : hours;
     }
   }, 1000);
 }
 
-// ADMIN ACTIONS
-function handleSetExamDate(e) {
-  e.preventDefault();
-  currentExamTitle = document.getElementById('adminExamTitle').value;
-  currentExamDate = document.getElementById('adminExamDate').value;
+function handleSetExamDate() {
+  const title = document.getElementById('adminExamTitle').value;
+  const date = document.getElementById('adminExamDate').value;
+
+  if (!title || !date) {
+    alert('Пожалуйста, укажите и название, и дату!');
+    return;
+  }
+
+  currentExamTitle = title;
+  currentExamDate = date;
 
   document.getElementById('nextExamTitle').innerText = currentExamTitle;
   document.getElementById('nextExamDate').innerText = currentExamDate;
-  alert('Даты экзаменов успешно опубликованы для всех учеников БИЛ!');
+  alert('Даты экзаменов успешно опубликованы!');
 }
 
 function handleCSVUpload() {
   const fileInput = document.getElementById('csvFileInput');
-  if (!fileInput.files.length) {
+  if (!fileInput || !fileInput.files.length) {
     alert('Пожалуйста, выберите CSV-файл с баллами!');
     return;
   }
-  
-  // Симуляция успешной обработки CSV файла
   alert('Файл ведомости успешно обработан! Общий рейтинг БИЛ обновлен.');
   globalRating[2].score = 91.5;
   renderRatingTable();
 }
 
-// NAVIGATION
 function switchTab(tabId, element) {
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 
-  document.getElementById(tabId).classList.add('active');
+  const activeTab = document.getElementById(tabId);
+  if (activeTab) activeTab.classList.add('active');
   if (element) element.classList.add('active');
 }
 
-// CHART
 function initChart() {
-  const ctx = document.getElementById('btsChart').getContext('2d');
-  new Chart(ctx, {
+  const ctx = document.getElementById('btsChart');
+  if (!ctx) return;
+  new Chart(ctx.getContext('2d'), {
     type: 'line',
     data: {
-      labels: studentBtsHistory.map(i => i.name),
+      labels: ['БТС-1', 'БТС-2', 'БТС-3'],
       datasets: [{
         label: 'Твой балл БТС',
-        data: studentBtsHistory.map(i => i.score),
+        data: [78, 82, 88.5],
         borderColor: '#4f46e5',
         backgroundColor: 'rgba(79, 70, 229, 0.15)',
         fill: true,
