@@ -295,6 +295,7 @@
     $('#grpSchool').hidden = !reg;
     $('#grpGrade').hidden = !(reg && !adm);
     $('#grpCode').hidden = !(reg && adm);
+    $('#grpStudentCode').hidden = !(reg && !adm);
 
     $('#authSubmit').textContent = reg ? (adm ? 'Создать аккаунт администратора' : 'Создать аккаунт') : 'Войти';
     $('#authPassword').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
@@ -540,6 +541,8 @@
         const grade = Number($('#regGrade').value);
         if (!Number.isInteger(grade) || grade < 1 || grade > 12) return showAuthMessage('error', 'Класс — число от 1 до 12.');
         meta = { full_name: fullName, school, grade };
+        const sc = $('#regStudentCode').value.trim();
+        if (sc) meta.student_code = sc;
       }
     }
 
@@ -550,7 +553,12 @@
     try {
       if (register) {
         const { data, error } = await sb.auth.signUp({ email, password, options: { data: meta } });
-        if (error) return showAuthMessage('error', asAdmin && /database error/i.test(error.message || '') ? 'Неверный код администратора.' : authMessage(error));
+        if (error) {
+          if (/database error/i.test(error.message || '')) {
+            return showAuthMessage('error', asAdmin ? 'Неверный код администратора.' : 'Неверный код ученика или он не указан. Код выдаёт учитель.');
+          }
+          return showAuthMessage('error', authMessage(error));
+        }
         if (data && data.session) {
           await enterApp(data.session.user || data.user, false, state.authRole);
         } else {
