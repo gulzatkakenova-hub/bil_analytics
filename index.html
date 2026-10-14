@@ -3,172 +3,238 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BIL Analytics & Rating Portal</title>
+  <title>BIL Analytics — результаты БТС и рейтинг</title>
+  <meta name="description" content="BIL Analytics: результаты БТС и КБО, зоны роста, рекомендации и общий рейтинг учеников БИЛ.">
+  <meta name="theme-color" content="#4f46e5">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="BIL Analytics & Rating Portal">
+  <meta property="og:description" content="Результаты БТС и КБО, зоны роста, рекомендации и общий рейтинг учеников БИЛ.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%234f46e5'/%3E%3Ctext x='50' y='70' font-size='58' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EB%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- Скрипты с defer выполняются по порядку после загрузки страницы -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+  <script src="script.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main">Перейти к содержимому</a>
 
-  <!-- AUTH MODAL -->
-  <div class="modal-overlay active" id="authModal">
-    <div class="modal-card auth-card">
-      <h2>🔐 Авторизация BIL Analytics</h2>
-      <p>Выберите роль для входа в систему:</p>
-      
-      <div class="role-selector">
-        <button type="button" class="role-btn active" id="roleStudentBtn" onclick="selectRole('student')">👨‍🎓 Ученик</button>
-        <button type="button" class="role-btn" id="roleAdminBtn" onclick="selectRole('admin')">👨‍🏫 Админ / Учитель</button>
+  <noscript>
+    <div class="noscript-msg">Для работы BIL Analytics нужен включённый JavaScript.</div>
+  </noscript>
+
+  <!-- ОКНО ВХОДА -->
+  <div class="modal-overlay active" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle" aria-describedby="authDesc">
+    <div class="auth-card">
+      <h2 id="authTitle">🔐 Вход в BIL Analytics</h2>
+      <p id="authDesc">Выберите роль для входа в систему.</p>
+
+      <div class="role-selector" role="radiogroup" aria-label="Роль">
+        <button type="button" class="role-btn active" id="roleStudentBtn" role="radio" aria-checked="true" data-role="student">👨‍🎓 Ученик</button>
+        <button type="button" class="role-btn" id="roleAdminBtn" role="radio" aria-checked="false" data-role="admin">👨‍🏫 Админ / Учитель</button>
       </div>
 
       <div class="form-group">
-        <label>Email</label>
+        <label for="loginEmail">Email</label>
         <input type="email" id="loginEmail" value="student@bil.edu.kz" readonly>
       </div>
 
-      <button type="button" class="btn btn-primary full-width" onclick="confirmLogin()">🚀 Войти в аккаунт</button>
+      <p class="demo-note">Демо-режим: вход без пароля, данные хранятся только в этом браузере.</p>
+
+      <button type="button" class="btn btn-primary full-width" id="loginBtn">🚀 Войти в аккаунт</button>
+      <button type="button" class="btn btn-link full-width" id="cancelAuthBtn" hidden>Отмена</button>
     </div>
   </div>
 
   <div class="app-container" id="reportArea">
-    <!-- Sidebar -->
+    <!-- Боковая панель (на телефоне — верхняя полоса и нижнее меню) -->
     <aside class="sidebar">
       <div class="brand">
         <h2>BIL Analytics</h2>
-        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
+        <button type="button" class="theme-toggle" id="themeBtn" aria-label="Включить тёмную тему">🌙</button>
       </div>
-      
+
       <div class="user-profile-badge">
         <span class="user-role-tag" id="userRoleTag">Ученик</span>
         <span class="user-email" id="userEmailTag">student@bil.edu.kz</span>
       </div>
 
-      <nav class="desktop-nav">
-        <button class="nav-btn active" onclick="switchTab('dashboard', this)">📊 Дашборд</button>
-        <button class="nav-btn" onclick="switchTab('bts', this)">📝 БТС & КБО</button>
-        <button class="nav-btn" onclick="switchTab('rating', this)">🌐 Общий рейтинг</button>
-        <!-- Кнопка админа по умолчанию СКРЫТА -->
-        <button class="nav-btn admin-only" id="adminTabBtn" onclick="switchTab('admin', this)" style="display: none;">⚙️ Админ-панель</button>
+      <nav class="main-nav" aria-label="Основная навигация">
+        <button type="button" class="nav-btn active" data-tab="dashboard" aria-current="page"><span class="nav-ico" aria-hidden="true">📊</span><span>Дашборд</span></button>
+        <button type="button" class="nav-btn" data-tab="bts"><span class="nav-ico" aria-hidden="true">📝</span><span>БТС &amp; КБО</span></button>
+        <button type="button" class="nav-btn" data-tab="rating"><span class="nav-ico" aria-hidden="true">🌐</span><span>Рейтинг</span></button>
+        <button type="button" class="nav-btn admin-only" id="adminTabBtn" data-tab="admin" hidden><span class="nav-ico" aria-hidden="true">⚙️</span><span>Админ</span></button>
       </nav>
 
-      <button class="btn btn-secondary logout-btn" onclick="openAuthModal()">🔑 Сменить аккаунт</button>
+      <button type="button" class="btn btn-secondary logout-btn" id="logoutBtn" aria-label="Сменить аккаунт">
+        <span aria-hidden="true">🔑</span><span class="logout-label">Сменить аккаунт</span>
+      </button>
     </aside>
 
-    <!-- Main Content -->
-    <main class="content">
-      <!-- DASHBOARD TAB -->
-      <section id="dashboard" class="tab-content active">
+    <main class="content" id="main">
+      <!-- ДАШБОРД -->
+      <section id="dashboard" class="tab-content active" aria-labelledby="dashTitle">
         <header class="top-header">
           <div>
-            <h1>Привет, <span id="welcomeName">Ученик</span>! 👋</h1>
-            <p>Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
+            <h1 id="dashTitle">Привет, <span id="welcomeName">Ученик</span>! 👋</h1>
+            <p class="subtitle">Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
           </div>
           <div class="header-actions">
-            <button class="btn btn-secondary" onclick="exportPDF()">📄 Скачать PDF отчёт</button>
+            <button type="button" class="btn btn-secondary" id="pdfBtn">📄 Скачать PDF отчёт</button>
           </div>
         </header>
 
-        <!-- Countdown Banner -->
         <div class="card countdown-card">
           <div class="countdown-info">
             <h3>⏳ Следующий экзамен: <span id="nextExamTitle">БТС-3 (Официальный)</span></h3>
-            <p>Дата проведения: <strong id="nextExamDate">15 Января 2027</strong></p>
+            <p>Дата проведения: <strong id="nextExamDate">15 января 2027</strong></p>
           </div>
           <div class="timer-box">
-            <span id="countdownDays">00</span> дней <span id="countdownHours">00</span> ч.
+            <div class="timer-units" id="timerUnits">
+              <div class="timer-unit"><span id="cdDays">00</span><small id="cdDaysLbl">дней</small></div>
+              <div class="timer-unit"><span id="cdHours">00</span><small id="cdHoursLbl">часов</small></div>
+              <div class="timer-unit"><span id="cdMins">00</span><small id="cdMinsLbl">минут</small></div>
+            </div>
+            <div class="timer-done" id="timerDone" hidden></div>
           </div>
         </div>
 
-        <!-- Stats Cards -->
         <div class="cards-grid">
           <div class="card highlight">
             <h3>Общий рейтинг БИЛ</h3>
-            <div class="rank" id="displayRank">#12 <span>из 1,200 учеников</span></div>
+            <div class="rank" id="displayRank">#12 <span>из 1 200 учеников</span></div>
           </div>
           <div class="card">
-            <h3>Средний балл БТС</h3>
-            <div class="score" id="latestScore">88.5 / 100</div>
+            <h3>Последний балл БТС</h3>
+            <div class="score" id="latestScore">88,5 <span>/ 100</span></div>
+            <p class="stat-sub" id="scoreDelta"></p>
+            <p class="stat-sub" id="avgScore"></p>
           </div>
           <div class="card">
-            <h3>КБО Статус</h3>
-            <div class="status">Топер (Top 5%)</div>
+            <h3>КБО статус</h3>
+            <div class="status" id="kboStatus">Топер</div>
+            <p class="stat-sub" id="kboSub"></p>
           </div>
         </div>
 
-        <!-- Analytics Row: Auto Topic Mastery -->
+        <div class="card badges-card">
+          <h3>🏅 Достижения</h3>
+          <div class="badges-grid" id="badgesGrid"></div>
+        </div>
+
         <div class="grid-2">
           <div class="card weak-spots-card">
-            <h3>⚠️ Зоны роста (Анализ тем ученика)</h3>
+            <h3>⚠️ Зоны роста (анализ тем ученика)</h3>
             <ul class="weak-list" id="weakTopicsList"></ul>
           </div>
 
           <div class="card advice-card">
-            <h3>💡 Персональные рекомендации ИИ</h3>
-            <div id="aiRecommendations"></div>
+            <h3>💡 Персональные рекомендации</h3>
+            <ol class="advice-list" id="aiRecommendations"></ol>
           </div>
         </div>
 
-        <!-- Progress Chart -->
         <div class="card chart-card">
           <h3>📈 Динамика результатов БТС</h3>
-          <canvas id="btsChart"></canvas>
+          <div class="chart-wrap">
+            <canvas id="btsChart" role="img" aria-label="График результатов БТС"></canvas>
+          </div>
+          <p class="hint" id="chartNote" hidden></p>
         </div>
       </section>
 
-      <!-- BTS TAB -->
-      <section id="bts" class="tab-content">
-        <h2>История сдач БТС / КБО</h2>
-        <ul id="historyList" class="history-list">
-          <li><strong>БТС-1:</strong> 78/100</li>
-          <li><strong>БТС-2:</strong> 82/100</li>
-          <li><strong>БТС-3:</strong> 88.5/100</li>
-        </ul>
+      <!-- БТС И КБО -->
+      <section id="bts" class="tab-content" aria-labelledby="btsTitle">
+        <h2 id="btsTitle">История сдач БТС / КБО</h2>
+        <ul id="historyList" class="history-list"></ul>
       </section>
 
-      <!-- RATING TAB -->
-      <section id="rating" class="tab-content">
-        <h2>Общий Рейтинг среди школ БИЛ</h2>
-        <table class="rating-table">
-          <thead>
-            <tr><th>Место</th><th>Имя</th><th>Лицей</th><th>Балл БТС</th></tr>
-          </thead>
-          <tbody id="ratingTableBody"></tbody>
-        </table>
+      <!-- РЕЙТИНГ -->
+      <section id="rating" class="tab-content" aria-labelledby="ratingTitle">
+        <h2 id="ratingTitle">Общий рейтинг среди школ БИЛ</h2>
+        <p class="hint">Демо-данные: в таблице показана часть рейтинга из 1 200 учеников.</p>
+
+        <div class="filters">
+          <div class="form-group grow">
+            <label for="ratingSearch">Поиск</label>
+            <input type="search" id="ratingSearch" placeholder="Имя или лицей" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="ratingSchool">Лицей</label>
+            <select id="ratingSchool"><option value="">Все лицеи</option></select>
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <table class="rating-table">
+            <caption class="sr-only">Рейтинг учеников БИЛ по баллу БТС</caption>
+            <thead>
+              <tr><th scope="col">Место</th><th scope="col">Имя</th><th scope="col">Лицей</th><th scope="col">Балл БТС</th></tr>
+            </thead>
+            <tbody id="ratingTableBody"></tbody>
+          </table>
+        </div>
+        <p class="hint" id="ratingCount" aria-live="polite"></p>
       </section>
 
-      <!-- ADMIN TAB (Только для роли Admin) -->
-      <section id="admin" class="tab-content">
-        <h2>⚙️ Панель Администратора / Координатора БИЛ</h2>
-        <p class="hint" style="margin-bottom: 20px;">Здесь вы можете управлять датами экзаменов и спецификациями тем для всех учеников лицея.</p>
-        
+      <!-- АДМИН-ПАНЕЛЬ (только для роли «Админ») -->
+      <section id="admin" class="tab-content" aria-labelledby="adminTitle">
+        <h2 id="adminTitle">⚙️ Панель администратора / координатора БИЛ</h2>
+        <p class="hint">Здесь можно управлять датой экзамена и темами для зон роста.</p>
+        <p class="notice">Демо-режим: изменения сохраняются только в этом браузере и не видны другим ученикам. Для общей публикации нужен сервер (например, Firebase или Supabase).</p>
+
         <div class="grid-2">
-          <div class="card">
-            <h3>📅 Установить официальную дату БТС / КБО</h3>
+          <form class="card" id="examForm" novalidate>
+            <h3>📅 Дата официального БТС / КБО</h3>
             <div class="form-group">
-              <label>Название экзамена</label>
-              <input type="text" id="adminExamTitle" placeholder="БТС-3 (Официальный)">
+              <label for="adminExamTitle">Название экзамена</label>
+              <input type="text" id="adminExamTitle" placeholder="БТС-3 (Официальный)" maxlength="80">
             </div>
-
-            <div class="form-group" style="margin-top: 10px;">
-              <label>Дата проведения</label>
+            <div class="form-group">
+              <label for="adminExamDate">Дата проведения</label>
               <input type="date" id="adminExamDate">
             </div>
+            <button type="submit" class="btn btn-primary">Сохранить дату</button>
+          </form>
 
-            <button type="button" class="btn btn-primary" onclick="handleSetExamDate()" style="margin-top: 12px;">Опубликовать дату для всех БИЛ</button>
-          </div>
+          <form class="card" id="topicForm" novalidate>
+            <h3>📘 Добавить тему в зоны роста</h3>
+            <div class="form-group">
+              <label for="newSubjectInput">Предмет</label>
+              <input type="text" id="newSubjectInput" placeholder="Например: Химия" maxlength="60">
+            </div>
+            <div class="form-group">
+              <label for="newTopicInput">Тема</label>
+              <input type="text" id="newTopicInput" placeholder="Например: Галогеналканы" maxlength="120">
+            </div>
+            <div class="form-group">
+              <label for="newScoreInput">Освоение, % (необязательно)</label>
+              <input type="number" id="newScoreInput" placeholder="50" min="0" max="100" step="1" inputmode="numeric">
+            </div>
+            <div class="form-group">
+              <label for="newRecInput">Рекомендация (необязательно)</label>
+              <input type="text" id="newRecInput" placeholder="Что повторить" maxlength="200">
+            </div>
+            <button type="submit" class="btn btn-primary">Добавить тему</button>
+          </form>
+        </div>
 
-          <div class="card">
-            <h3>📘 Управление темами и спецификацией</h3>
-            <p class="hint">Добавьте тему в каталог зон роста для 10 класса:</p>
-            <input type="text" id="newSubjectInput" placeholder="Предмет (например: Химия)" style="margin-bottom: 8px;">
-            <input type="text" id="newTopicInput" placeholder="Тема (например: Галогеноалканы)" style="margin-bottom: 8px;">
-            <button type="button" class="btn btn-primary" onclick="addNewTopicByAdmin()">Добавить тему в систему</button>
+        <div class="card">
+          <div class="card-head">
+            <h3>Текущие темы</h3>
+            <button type="button" class="btn btn-secondary" id="resetBtn">Сбросить к исходным</button>
           </div>
+          <ul class="admin-topics" id="adminTopicsList"></ul>
         </div>
       </section>
     </main>
   </div>
 
-  <script src="script.js"></script>
+  <div class="toast-container" id="toasts" role="status" aria-live="polite"></div>
 </body>
 </html>
