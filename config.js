@@ -11,6 +11,6 @@
 //
 // Пока поля пустые, сайт работает в демо-режиме (данные только в браузере).
 window.BIL_CONFIG = {
-  SUPABASE_URL: 'sb_publishable_GsMLz1WVLpvnRX84pNER-g_49H4-4G7',
+  SUPABASE_URL: 'https://aismxrugcrqjqdlwhmtm.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpc214cnVnY3JxanFkbHdobXRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MzgxNzcsImV4cCI6MjEwNzUxNDE3N30.xNm6EokLAUVIgb2WxE-_rkNweUGD6ZheQBRcBO6OUEY'
 }
