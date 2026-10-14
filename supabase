@@ -1,0 +1,233 @@
+-- =====================================================================
+--  BIL Analytics — схема базы данных для Supabase
+--  Как запустить: Supabase → SQL Editor → New query → вставить всё → Run.
+--  Скрипт можно запускать повторно: он ничего не удаляет из данных.
+-- =====================================================================
+
+-- ---------- 1. Таблицы ----------
+
+-- Профиль пользователя (создаётся автоматически при регистрации)
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  email      text,
+  full_name  text not null default '',
+  school     text,
+  grade      int check (grade between 1 and 12),
+  role       text not null default 'student' check (role in ('student', 'admin')),
+  created_at timestamptz not null default now()
+);
+
+-- Дата ближайшего официального экзамена (всегда одна строка с id = 1)
+create table if not exists public.exam_settings (
+  id         int primary key default 1 check (id = 1),
+  title      text not null,
+  exam_date  date not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Каталог тем (зоны роста). Добавляет администратор
+create table if not exists public.topics (
+  id             bigint generated always as identity primary key,
+  subject        text not null,
+  topic          text not null,
+  recommendation text not null default '',
+  created_at     timestamptz not null default now()
+);
+
+-- Освоение темы конкретным учеником, в процентах
+create table if not exists public.topic_scores (
+  student_id uuid   not null references public.profiles(id) on delete cascade,
+  topic_id   bigint not null references public.topics(id) on delete cascade,
+  score      int    not null check (score between 0 and 100),
+  primary key (student_id, topic_id)
+);
+
+-- Результаты БТС / КБО
+create table if not exists public.bts_results (
+  id         bigint generated always as identity primary key,
+  student_id uuid    not null references public.profiles(id) on delete cascade,
+  exam_name  text    not null,
+  score      numeric(5,2) not null check (score between 0 and 100),
+  taken_on   date    not null default current_date
+);
+create index if not exists bts_results_student_idx on public.bts_results (student_id, taken_on);
+
+-- ---------- 2. Вспомогательные функции ----------
+
+-- Проверка «текущий пользователь — администратор»
+create or replace function public.is_admin()
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
+$$;
+
+-- Автоматически создаёт профиль при регистрации.
+-- Роль ВСЕГДА student: из данных формы регистрации она не берётся.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name, school, grade)
+  values (
+    new.id,
+    new.email,
+    coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), split_part(new.email, '@', 1)),
+    nullif(trim(new.raw_user_meta_data ->> 'school'), ''),
+    case when (new.raw_user_meta_data ->> 'grade') ~ '^([1-9]|1[0-2])$'
+         then (new.raw_user_meta_data ->> 'grade')::int end
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- Общий рейтинг: по последнему результату БТС каждого ученика.
+-- Имена сокращаются до «Имя Ф.», чтобы не показывать полные имена всем подряд.
+create or replace function public.get_leaderboard()
+returns table (place bigint, display_name text, school text, score numeric, is_me boolean)
+language sql stable security definer set search_path = public
+as $$
+  with latest as (
+    select distinct on (r.student_id) r.student_id, r.score
+    from public.bts_results r
+    order by r.student_id, r.taken_on desc, r.id desc
+  )
+  select
+    rank() over (order by l.score desc),
+    case when position(' ' in trim(p.full_name)) > 0
+         then split_part(trim(p.full_name), ' ', 1) || ' ' || left(split_part(trim(p.full_name), ' ', 2), 1) || '.'
+         else trim(p.full_name) end,
+    p.school,
+    l.score,
+    p.id = auth.uid()
+  from latest l
+  join public.profiles p on p.id = l.student_id
+  where p.role = 'student'
+  order by 1, 2;
+$$;
+
+-- Удобно вносить результаты по email, не копируя длинные id.
+-- Пример: select public.add_bts_result('student@mail.com', 'БТС-1', 78, '2026-09-20');
+create or replace function public.add_bts_result(p_email text, p_exam text, p_score numeric, p_date date default current_date)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+declare v_id uuid;
+begin
+  if auth.uid() is not null and not public.is_admin() then
+    raise exception 'Только администратор может вносить результаты';
+  end if;
+  select id into v_id from public.profiles where lower(email) = lower(p_email);
+  if v_id is null then raise exception 'Ученик с email % не найден', p_email; end if;
+  insert into public.bts_results (student_id, exam_name, score, taken_on) values (v_id, p_exam, p_score, p_date);
+end;
+$$;
+
+-- Пример: select public.set_topic_score('student@mail.com', 1, 42);   -- 1 = id темы
+create or replace function public.set_topic_score(p_email text, p_topic_id bigint, p_score int)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+declare v_id uuid;
+begin
+  if auth.uid() is not null and not public.is_admin() then
+    raise exception 'Только администратор может вносить оценки по темам';
+  end if;
+  select id into v_id from public.profiles where lower(email) = lower(p_email);
+  if v_id is null then raise exception 'Ученик с email % не найден', p_email; end if;
+  insert into public.topic_scores (student_id, topic_id, score) values (v_id, p_topic_id, p_score)
+  on conflict (student_id, topic_id) do update set score = excluded.score;
+end;
+$$;
+
+-- ---------- 3. Права доступа (RLS) ----------
+-- Правило: ученик видит только своё, администратор — всё.
+-- Роль пользователя нельзя изменить с сайта: на profiles нет политик записи.
+
+alter table public.profiles      enable row level security;
+alter table public.exam_settings enable row level security;
+alter table public.topics        enable row level security;
+alter table public.topic_scores  enable row level security;
+alter table public.bts_results   enable row level security;
+
+drop policy if exists profiles_select on public.profiles;
+create policy profiles_select on public.profiles
+  for select to authenticated using (id = auth.uid() or public.is_admin());
+
+drop policy if exists exam_select on public.exam_settings;
+create policy exam_select on public.exam_settings
+  for select to authenticated using (true);
+drop policy if exists exam_insert on public.exam_settings;
+create policy exam_insert on public.exam_settings
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists exam_update on public.exam_settings;
+create policy exam_update on public.exam_settings
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists topics_select on public.topics;
+create policy topics_select on public.topics
+  for select to authenticated using (true);
+drop policy if exists topics_insert on public.topics;
+create policy topics_insert on public.topics
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists topics_update on public.topics;
+create policy topics_update on public.topics
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists topics_delete on public.topics;
+create policy topics_delete on public.topics
+  for delete to authenticated using (public.is_admin());
+
+drop policy if exists scores_select on public.topic_scores;
+create policy scores_select on public.topic_scores
+  for select to authenticated using (student_id = auth.uid() or public.is_admin());
+drop policy if exists scores_write on public.topic_scores;
+create policy scores_write on public.topic_scores
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists results_select on public.bts_results;
+create policy results_select on public.bts_results
+  for select to authenticated using (student_id = auth.uid() or public.is_admin());
+drop policy if exists results_write on public.bts_results;
+create policy results_write on public.bts_results
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Явные права на уровне SQL (в новых проектах Supabase они не выдаются автоматически).
+-- Для неавторизованных (anon) доступа нет вообще.
+grant usage on schema public to authenticated;
+grant select on public.profiles, public.exam_settings, public.topics, public.topic_scores, public.bts_results to authenticated;
+grant insert, update on public.exam_settings to authenticated;
+grant insert, update, delete on public.topics, public.topic_scores, public.bts_results to authenticated;
+
+revoke all on function public.is_admin()        from public, anon;
+revoke all on function public.get_leaderboard() from public, anon;
+revoke all on function public.add_bts_result(text, text, numeric, date) from public, anon;
+revoke all on function public.set_topic_score(text, bigint, int)        from public, anon;
+grant execute on function public.is_admin()        to authenticated;
+grant execute on function public.get_leaderboard() to authenticated;
+grant execute on function public.add_bts_result(text, text, numeric, date) to authenticated;
+grant execute on function public.set_topic_score(text, bigint, int)        to authenticated;
+
+-- ---------- 4. Стартовые данные ----------
+insert into public.exam_settings (id, title, exam_date)
+values (1, 'БТС-3 (Официальный)', '2027-01-15')
+on conflict (id) do nothing;
+
+insert into public.topics (subject, topic, recommendation)
+select * from (values
+  ('Химия',       'Нуклеофильное замещение (Haloalkanes)', 'Пройди карточки Anki по механизмам SN1/SN2 реакций.'),
+  ('Математика',  'Стереометрия & Вероятность',            'Реши 5 олимпиадных задач КБО 2024–2025 гг.'),
+  ('Биология',    'Генетические матрицы & ДНК',            'Повтори тему Репликация ДНК из учебника CLIL.'),
+  ('ЕНТ География','ГИС & Пространственный анализ',        'Просмотри видеоурок по определению топографических масштабов.')
+) as t(subject, topic, recommendation)
+where not exists (select 1 from public.topics);
+
+-- ---------- 5. Первый администратор ----------
+-- 1) Зарегистрируйтесь на сайте как обычный пользователь.
+-- 2) Уберите «--» в начале строки ниже, подставьте свой email и нажмите Run:
+-- update public.profiles set role = 'admin' where lower(email) = lower('ВАШ_EMAIL@gmail.com');
