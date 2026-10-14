@@ -273,6 +273,8 @@
     $('#cancelAuthBtn').hidden = !(IS_DEMO && state.loggedIn);
     $('#authModal').classList.add('active');
     $('#reportArea').inert = true;
+    // В боевом режиме до входа содержимое под окном скрыто полностью
+    $('#reportArea').classList.toggle('locked', !IS_DEMO && !state.loggedIn);
     if (IS_DEMO) {
       setPickedRole(state.role);
       const active = $('.role-btn.active');
@@ -286,6 +288,7 @@
   function closeAuth() {
     $('#authModal').classList.remove('active');
     $('#reportArea').inert = false;
+    $('#reportArea').classList.remove('locked');
   }
 
   function configureForMode() {
@@ -308,7 +311,7 @@
     }
 
     if (MODE === 'broken') {
-      $('#authDesc').textContent = '⚠️ Не удалось загрузить библиотеку Supabase. Проверьте интернет и обновите страницу.';
+      $('#authDesc').textContent = '⚠️ Не удалось загрузить библиотеку Supabase. Проверьте интернет, отключите блокировщик рекламы и обновите страницу (Ctrl+F5).';
     } else if (MODE === 'supabase') {
       setAuthTab('login');
     }
