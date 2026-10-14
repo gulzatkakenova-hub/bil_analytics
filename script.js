@@ -183,6 +183,9 @@
     role: IS_DEMO && saved.session && saved.session.role === 'admin' ? 'admin' : 'student',
     pickedRole: 'student',
     authTab: 'login',
+    authRole: saved.authRole === 'admin' ? 'admin' : 'student',
+    accountRole: 'student',
+    viewRole: 'student',
     user: null,
     profile: { name: '', email: '', school: '', grade: '' },
     exam: IS_DEMO ? (sanitizeExam(saved.exam) || Object.assign({}, DEFAULT_EXAM)) : null,
@@ -205,6 +208,8 @@
   function resetData() {
     state.user = null;
     state.role = 'student';
+    state.accountRole = 'student';
+    state.viewRole = 'student';
     state.profile = { name: '', email: '', school: '', grade: '' };
     state.exam = null;
     state.topics = [];
@@ -283,17 +288,38 @@
     $('#loginEmail').value = admin ? 'admin@bil.edu.kz' : 'student@bil.edu.kz';
   }
 
+  function updateAuthFields() {
+    const reg = state.authTab === 'register';
+    const adm = state.authRole === 'admin';
+    $('#grpName').hidden = !reg;
+    $('#grpSchool').hidden = !reg;
+    $('#grpGrade').hidden = !(reg && !adm);
+    $('#grpCode').hidden = !(reg && adm);
+
+    $('#authSubmit').textContent = reg ? (adm ? 'Создать аккаунт администратора' : 'Создать аккаунт') : 'Войти';
+    $('#authPassword').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
+    $('#authDesc').textContent = reg
+      ? (adm ? 'Для регистрации администратора нужен код, который выдаёт координатор БИЛ.' : 'Создайте аккаунт ученика.')
+      : (adm ? 'Войдите как администратор: нужен аккаунт с правами администратора.' : 'Войдите по email и паролю.');
+  }
+
   function setAuthTab(tab) {
     state.authTab = tab === 'register' ? 'register' : 'login';
     const reg = state.authTab === 'register';
     $('#tabLogin').classList.toggle('active', !reg);
     $('#tabRegister').classList.toggle('active', reg);
-    $$('.register-only').forEach((el) => { el.hidden = !reg; });
-    $('#authSubmit').textContent = reg ? 'Создать аккаунт' : 'Войти';
-    $('#authPassword').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
-    $('#authDesc').textContent = reg
-      ? 'Создайте аккаунт ученика. Роль администратора выдаёт координатор.'
-      : 'Войдите по email и паролю.';
+    updateAuthFields();
+    showAuthMessage('', '');
+  }
+
+  function setAuthRole(role) {
+    state.authRole = role === 'admin' ? 'admin' : 'student';
+    const adm = state.authRole === 'admin';
+    $('#authRoleStudent').classList.toggle('active', !adm);
+    $('#authRoleAdmin').classList.toggle('active', adm);
+    $('#authRoleStudent').setAttribute('aria-checked', String(!adm));
+    $('#authRoleAdmin').setAttribute('aria-checked', String(adm));
+    updateAuthFields();
     showAuthMessage('', '');
   }
 
@@ -350,6 +376,7 @@
     if (MODE === 'broken') {
       $('#authDesc').textContent = BROKEN_MSG;
     } else if (MODE === 'supabase') {
+      setAuthRole(state.authRole);
       setAuthTab('login');
     }
   }
@@ -422,7 +449,9 @@
     const scoreMap = new Map(scores.map((s) => [String(s.topic_id), Number(s.score)]));
 
     state.user = user;
-    state.role = prof.role === 'admin' ? 'admin' : 'student';
+    state.accountRole = prof.role === 'admin' ? 'admin' : 'student';
+    // Админ может войти как ученик (тогда видит интерфейс ученика); больше прав, чем у аккаунта, не получить
+    state.role = state.accountRole === 'admin' && state.viewRole === 'admin' ? 'admin' : 'student';
     state.profile = {
       name: prof.full_name || prof.email || user.email || '',
       email: prof.email || user.email || '',
@@ -448,18 +477,33 @@
     state.total = state.rating.length;
   }
 
-  async function enterApp(user, fromSession) {
-    try {
-      await loadSupabaseData(user);
-    } catch (err) {
+  async function enterApp(user, fromSession, wantRole) {
+    // Какой интерфейс открыть: при входе — выбранный в форме, при восстановлении сессии — прошлый выбор
+    state.viewRole = fromSession
+      ? (readStore().viewRole === 'student' ? 'student' : 'admin')
+      : (wantRole === 'admin' ? 'admin' : 'student');
+
+    const reject = async (message) => {
       try { await sb.auth.signOut(); } catch (e) { /* игнорируем */ }
       resetData();
       renderAll();
       openAuth();
-      showAuthMessage('error', 'Не удалось загрузить данные: ' + ((err && err.message) || 'ошибка'));
+      showAuthMessage('error', message);
       return false;
+    };
+
+    try {
+      await loadSupabaseData(user);
+    } catch (err) {
+      return reject('Не удалось загрузить данные: ' + ((err && err.message) || 'ошибка'));
     }
+
+    if (!fromSession && wantRole === 'admin' && state.accountRole !== 'admin') {
+      return reject('У этого аккаунта нет прав администратора. Войдите как ученик или зарегистрируйтесь как администратор с кодом.');
+    }
+
     state.loggedIn = true;
+    if (!fromSession) writeStore({ viewRole: state.viewRole });
     closeAuth();
     renderAll();
     const hash = location.hash.slice(1);
@@ -476,6 +520,7 @@
     const email = $('#authEmail').value.trim();
     const password = $('#authPassword').value;
     const register = state.authTab === 'register';
+    const asAdmin = state.authRole === 'admin';
 
     if (!/^\S+@\S+\.\S+$/.test(email)) return showAuthMessage('error', 'Введите корректный email.');
     if (register && password.length < 8) return showAuthMessage('error', 'Пароль должен быть не короче 8 символов.');
@@ -485,32 +530,41 @@
     if (register) {
       const fullName = $('#regName').value.trim();
       const school = $('#regSchool').value.trim();
-      const grade = Number($('#regGrade').value);
       if (fullName.length < 2) return showAuthMessage('error', 'Укажите имя и фамилию.');
       if (!school) return showAuthMessage('error', 'Укажите лицей.');
-      if (!Number.isInteger(grade) || grade < 1 || grade > 12) return showAuthMessage('error', 'Класс — число от 1 до 12.');
-      meta = { full_name: fullName, school, grade };
+      if (asAdmin) {
+        const code = $('#regCode').value.trim();
+        if (!code) return showAuthMessage('error', 'Введите код администратора. Его выдаёт координатор БИЛ.');
+        meta = { full_name: fullName, school, admin_code: code };
+      } else {
+        const grade = Number($('#regGrade').value);
+        if (!Number.isInteger(grade) || grade < 1 || grade > 12) return showAuthMessage('error', 'Класс — число от 1 до 12.');
+        meta = { full_name: fullName, school, grade };
+      }
     }
+
+    writeStore({ authRole: state.authRole });
 
     const btn = $('#authSubmit');
     setBusy(btn, true, '⏳ Подождите…');
     try {
       if (register) {
         const { data, error } = await sb.auth.signUp({ email, password, options: { data: meta } });
-        if (error) return showAuthMessage('error', authMessage(error));
+        if (error) return showAuthMessage('error', asAdmin && /database error/i.test(error.message || '') ? 'Неверный код администратора.' : authMessage(error));
         if (data && data.session) {
-          await enterApp(data.session.user || data.user, false);
+          await enterApp(data.session.user || data.user, false, state.authRole);
         } else {
           setAuthTab('login');
           $('#authEmail').value = email;
           $('#authPassword').value = '';
+          $('#regCode').value = '';
           showAuthMessage('info', `Мы отправили письмо на ${email}. Подтвердите email по ссылке, затем войдите.`);
         }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password });
         if (error) return showAuthMessage('error', authMessage(error));
         $('#authPassword').value = '';
-        await enterApp(data.user || (data.session && data.session.user), false);
+        await enterApp(data.user || (data.session && data.session.user), false, state.authRole);
       }
     } catch (err) {
       showAuthMessage('error', authMessage(err));
@@ -527,6 +581,7 @@
     switchTab('dashboard', { silent: true });
     if (MODE === 'supabase') {
       $('#authPassword').value = '';
+      $('#regCode').value = '';
       setAuthTab('login');
     }
     openAuth();
@@ -570,6 +625,7 @@
   function switchTab(id, opts = {}) {
     if (!TAB_IDS.includes(id)) id = 'dashboard';
     if (id === 'admin' && state.role !== 'admin') id = 'dashboard';
+    if (state.role === 'admin' && (id === 'dashboard' || id === 'bts')) id = 'admin';
 
     $$('.tab-content').forEach((s) => s.classList.toggle('active', s.id === id));
     $$('.nav-btn').forEach((b) => {
@@ -605,6 +661,8 @@
     $('#profSchool').textContent = state.profile.school || '—';
     $('#profGrade').textContent = state.profile.grade || '—';
     $('#adminTabBtn').hidden = !admin;
+    // Личные вкладки ученика (дашборд, БТС) администратору не нужны
+    $$('.student-only').forEach((el) => { el.hidden = admin; });
   }
 
   function renderExam() {
@@ -1090,6 +1148,7 @@
   function bindEvents() {
     $$('.role-btn[data-role]').forEach((b) => b.addEventListener('click', () => setPickedRole(b.dataset.role)));
     $$('.role-btn[data-auth-tab]').forEach((b) => b.addEventListener('click', () => setAuthTab(b.dataset.authTab)));
+    $$('.role-btn[data-auth-role]').forEach((b) => b.addEventListener('click', () => setAuthRole(b.dataset.authRole)));
     $('#loginBtn').addEventListener('click', loginDemo);
     $('#authForm').addEventListener('submit', onAuthSubmit);
     $('#cancelAuthBtn').addEventListener('click', closeAuth);
