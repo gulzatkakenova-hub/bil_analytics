@@ -19,6 +19,8 @@
   <!-- Скрипты с defer выполняются по порядку после загрузки страницы -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" defer></script>
+  <script src="config.js" defer></script>
   <script src="script.js" defer></script>
 </head>
 <body>
@@ -34,19 +36,58 @@
       <h2 id="authTitle">🔐 Вход в BIL Analytics</h2>
       <p id="authDesc">Выберите роль для входа в систему.</p>
 
-      <div class="role-selector" role="radiogroup" aria-label="Роль">
-        <button type="button" class="role-btn active" id="roleStudentBtn" role="radio" aria-checked="true" data-role="student">👨‍🎓 Ученик</button>
-        <button type="button" class="role-btn" id="roleAdminBtn" role="radio" aria-checked="false" data-role="admin">👨‍🏫 Админ / Учитель</button>
+      <!-- Демо-режим (Supabase не подключён) -->
+      <div id="authDemo">
+        <div class="role-selector" role="radiogroup" aria-label="Роль">
+          <button type="button" class="role-btn active" id="roleStudentBtn" role="radio" aria-checked="true" data-role="student">👨‍🎓 Ученик</button>
+          <button type="button" class="role-btn" id="roleAdminBtn" role="radio" aria-checked="false" data-role="admin">👨‍🏫 Админ / Учитель</button>
+        </div>
+
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" value="student@bil.edu.kz" readonly>
+        </div>
+
+        <p class="demo-note">Демо-режим: вход без пароля, данные хранятся только в этом браузере.</p>
+
+        <button type="button" class="btn btn-primary full-width" id="loginBtn">🚀 Войти в аккаунт</button>
       </div>
 
-      <div class="form-group">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" value="student@bil.edu.kz" readonly>
-      </div>
+      <!-- Настоящий вход через Supabase -->
+      <form id="authForm" novalidate hidden>
+        <div class="role-selector auth-tabs">
+          <button type="button" class="role-btn active" id="tabLogin" data-auth-tab="login">Вход</button>
+          <button type="button" class="role-btn" id="tabRegister" data-auth-tab="register">Регистрация</button>
+        </div>
 
-      <p class="demo-note">Демо-режим: вход без пароля, данные хранятся только в этом браузере.</p>
+        <div class="form-group register-only" hidden>
+          <label for="regName">Имя и фамилия</label>
+          <input type="text" id="regName" autocomplete="name" maxlength="80" placeholder="Например: Айдана Ким">
+        </div>
+        <div class="form-group register-only" hidden>
+          <label for="regSchool">Лицей</label>
+          <input type="text" id="regSchool" maxlength="60" placeholder="Например: Алматы БИЛ">
+        </div>
+        <div class="form-group register-only" hidden>
+          <label for="regGrade">Класс</label>
+          <input type="number" id="regGrade" min="1" max="12" step="1" inputmode="numeric" placeholder="10">
+        </div>
 
-      <button type="button" class="btn btn-primary full-width" id="loginBtn">🚀 Войти в аккаунт</button>
+        <div class="form-group">
+          <label for="authEmail">Email</label>
+          <input type="email" id="authEmail" autocomplete="email" maxlength="120" placeholder="name@example.com">
+        </div>
+        <div class="form-group">
+          <label for="authPassword">Пароль</label>
+          <input type="password" id="authPassword" autocomplete="current-password" maxlength="72" placeholder="Минимум 8 символов">
+        </div>
+
+        <p class="form-error" id="authError" role="alert" hidden></p>
+        <p class="form-info" id="authInfo" role="status" hidden></p>
+
+        <button type="submit" class="btn btn-primary full-width" id="authSubmit">Войти</button>
+      </form>
+
       <button type="button" class="btn btn-link full-width" id="cancelAuthBtn" hidden>Отмена</button>
     </div>
   </div>
@@ -82,7 +123,7 @@
         <header class="top-header">
           <div>
             <h1 id="dashTitle">Привет, <span id="welcomeName">Ученик</span>! 👋</h1>
-            <p class="subtitle">Лицей: <strong>BIL / КТЛ</strong> | Класс: <strong>10</strong></p>
+            <p class="subtitle">Лицей: <strong id="profSchool">BIL / КТЛ</strong> | Класс: <strong id="profGrade">10</strong></p>
           </div>
           <div class="header-actions">
             <button type="button" class="btn btn-secondary" id="pdfBtn">📄 Скачать PDF отчёт</button>
@@ -157,7 +198,7 @@
       <!-- РЕЙТИНГ -->
       <section id="rating" class="tab-content" aria-labelledby="ratingTitle">
         <h2 id="ratingTitle">Общий рейтинг среди школ БИЛ</h2>
-        <p class="hint">Демо-данные: в таблице показана часть рейтинга из 1 200 учеников.</p>
+        <p class="hint" id="ratingHint">Демо-данные: в таблице показана часть рейтинга из 1 200 учеников.</p>
 
         <div class="filters">
           <div class="form-group grow">
@@ -186,7 +227,8 @@
       <section id="admin" class="tab-content" aria-labelledby="adminTitle">
         <h2 id="adminTitle">⚙️ Панель администратора / координатора БИЛ</h2>
         <p class="hint">Здесь можно управлять датой экзамена и темами для зон роста.</p>
-        <p class="notice">Демо-режим: изменения сохраняются только в этом браузере и не видны другим ученикам. Для общей публикации нужен сервер (например, Firebase или Supabase).</p>
+        <p class="notice demo-only">Демо-режим: изменения сохраняются только в этом браузере и не видны другим ученикам. Чтобы они были общими, подключите Supabase (файл config.js).</p>
+        <p class="notice sb-only" hidden>Дата экзамена и темы общие: их увидят все ученики. Результаты БТС и оценки по темам вносятся в Supabase (Table Editor или SQL-функции add_bts_result и set_topic_score).</p>
 
         <div class="grid-2">
           <form class="card" id="examForm" novalidate>
@@ -212,7 +254,7 @@
               <label for="newTopicInput">Тема</label>
               <input type="text" id="newTopicInput" placeholder="Например: Галогеналканы" maxlength="120">
             </div>
-            <div class="form-group">
+            <div class="form-group demo-only">
               <label for="newScoreInput">Освоение, % (необязательно)</label>
               <input type="number" id="newScoreInput" placeholder="50" min="0" max="100" step="1" inputmode="numeric">
             </div>
@@ -227,7 +269,7 @@
         <div class="card">
           <div class="card-head">
             <h3>Текущие темы</h3>
-            <button type="button" class="btn btn-secondary" id="resetBtn">Сбросить к исходным</button>
+            <button type="button" class="btn btn-secondary demo-only" id="resetBtn">Сбросить к исходным</button>
           </div>
           <ul class="admin-topics" id="adminTopicsList"></ul>
         </div>
