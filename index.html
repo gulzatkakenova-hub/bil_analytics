@@ -56,15 +56,30 @@
           <button type="button" class="role-btn" id="tabRegister" data-auth-tab="register">Регистрация</button>
         </div>
 
-        <div class="form-group register-only" hidden>
+        <div class="form-group">
+          <span class="field-label" id="authRoleLabel">Роль</span>
+          <div class="role-selector auth-role" role="radiogroup" aria-labelledby="authRoleLabel">
+            <button type="button" class="role-btn active" id="authRoleStudent" role="radio" aria-checked="true" data-auth-role="student">👨‍🎓 Ученик</button>
+            <button type="button" class="role-btn" id="authRoleAdmin" role="radio" aria-checked="false" data-auth-role="admin">👨‍🏫 Админ / Учитель</button>
+          </div>
+        </div>
+
+        <div class="form-group" id="grpName" hidden>
           <label for="regName">Имя и фамилия</label>
           <input type="text" id="regName" autocomplete="name" maxlength="80" placeholder="Например: Айдана Ким">
         </div>
-        <div class="form-group register-only" hidden>
+        <div class="form-group" id="grpSchool" hidden>
           <label for="regSchool">Лицей</label>
-          <input type="text" id="regSchool" maxlength="60" placeholder="Например: Алматы БИЛ">
+          <input type="text" id="regSchool" list="schoolList" maxlength="60" placeholder="Выберите из списка или впишите" autocomplete="off">
+          <datalist id="schoolList">
+            <option value="Щучинск IT BIL"></option>
+            <option value="Астана БИЛ"></option>
+            <option value="Алматы БИЛ"></option>
+            <option value="Караганда БИЛ"></option>
+            <option value="BIL / КТЛ"></option>
+          </datalist>
         </div>
-        <div class="form-group register-only" hidden>
+        <div class="form-group" id="grpGrade" hidden>
           <label for="regGrade">Класс</label>
           <input type="number" id="regGrade" min="1" max="12" step="1" inputmode="numeric" placeholder="10">
         </div>
@@ -76,6 +91,10 @@
         <div class="form-group">
           <label for="authPassword">Пароль</label>
           <input type="password" id="authPassword" autocomplete="current-password" maxlength="72" placeholder="Минимум 8 символов">
+        </div>
+        <div class="form-group" id="grpCode" hidden>
+          <label for="regCode">Код администратора</label>
+          <input type="password" id="regCode" autocomplete="off" maxlength="100" placeholder="Выдаёт координатор БИЛ">
         </div>
 
         <p class="form-error" id="authError" role="alert" hidden></p>
@@ -102,8 +121,8 @@
       </div>
 
       <nav class="main-nav" aria-label="Основная навигация">
-        <button type="button" class="nav-btn active" data-tab="dashboard" aria-current="page"><span class="nav-ico" aria-hidden="true">📊</span><span>Дашборд</span></button>
-        <button type="button" class="nav-btn" data-tab="bts"><span class="nav-ico" aria-hidden="true">📝</span><span>БТС &amp; КБО</span></button>
+        <button type="button" class="nav-btn student-only active" data-tab="dashboard" aria-current="page"><span class="nav-ico" aria-hidden="true">📊</span><span>Дашборд</span></button>
+        <button type="button" class="nav-btn student-only" data-tab="bts"><span class="nav-ico" aria-hidden="true">📝</span><span>БТС &amp; КБО</span></button>
         <button type="button" class="nav-btn" data-tab="rating"><span class="nav-ico" aria-hidden="true">🌐</span><span>Рейтинг</span></button>
         <button type="button" class="nav-btn admin-only" id="adminTabBtn" data-tab="admin" hidden><span class="nav-ico" aria-hidden="true">⚙️</span><span>Админ</span></button>
       </nav>
