@@ -1,9 +1,24 @@
 'use strict';
 
 (function () {
+  /* ============ Режим работы: Supabase или демо ============ */
+  const CFG = window.BIL_CONFIG || {};
+  const SB_URL = String(CFG.SUPABASE_URL || '').trim();
+  const SB_KEY = String(CFG.SUPABASE_ANON_KEY || '').trim();
+
+  let MODE = 'demo'; // 'demo' | 'supabase' | 'broken'
+  let sb = null;
+  if (SB_URL && SB_KEY) {
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+      try { sb = window.supabase.createClient(SB_URL, SB_KEY); MODE = 'supabase'; } catch (e) { MODE = 'broken'; }
+    } else {
+      MODE = 'broken';
+    }
+  }
+  const IS_DEMO = MODE === 'demo';
+
   /* ============ Константы и демо-данные ============ */
   const STORE_KEY = 'bil_analytics_v2';
-  const TOTAL_STUDENTS = 1200;
   const TAB_IDS = ['dashboard', 'bts', 'rating', 'admin'];
 
   const DEFAULT_EXAM = { title: 'БТС-3 (Официальный)', date: '2027-01-15' };
@@ -15,13 +30,13 @@
     { id: 'geo-gis', subject: 'ЕНТ География', topic: 'ГИС & Пространственный анализ', score: 71, recommendation: 'Просмотри видеоурок по определению топографических масштабов.' }
   ];
 
-  const BTS_HISTORY = [
+  const DEMO_HISTORY = [
     { name: 'БТС-1', score: 78 },
     { name: 'БТС-2', score: 82 },
     { name: 'БТС-3', score: 88.5 }
   ];
 
-  const RATING = [
+  const DEMO_RATING = [
     { rank: 1, name: 'Арман С.', school: 'Астана БИЛ', score: 96.5 },
     { rank: 2, name: 'Данияр К.', school: 'Алматы БИЛ', score: 95.0 },
     { rank: 3, name: 'Аружан Т.', school: 'Шымкент БИЛ', score: 94.2 },
@@ -37,6 +52,7 @@
     { rank: 13, name: 'Айдана К.', school: 'Алматы БИЛ', score: 88.1 },
     { rank: 14, name: 'Санжар Д.', school: 'Актобе БИЛ', score: 87.6 }
   ];
+  const DEMO_TOTAL = 1200;
 
   /* ============ Вспомогательные функции ============ */
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -58,16 +74,16 @@
     return many;
   }
 
-  const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const ISO_RE = /^\d{4}-\d{2}-\d{2}/;
 
   function parseLocalDate(iso) {
-    const [y, m, d] = iso.split('-').map(Number);
+    const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
     return new Date(y, m - 1, d);
   }
 
   function isValidIso(iso) {
     if (typeof iso !== 'string' || !ISO_RE.test(iso)) return false;
-    const [y, m, d] = iso.split('-').map(Number);
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
     const dt = parseLocalDate(iso);
     return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
   }
@@ -83,7 +99,7 @@
       .replace(/\s?г\.$/, '');
   }
 
-  /* ============ Хранилище (localStorage с защитой от ошибок) ============ */
+  /* ============ Локальное хранилище (демо-режим, тема) ============ */
   function readStore() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
@@ -118,7 +134,7 @@
 
   function sanitizeExam(exam) {
     if (!exam || typeof exam.title !== 'string' || !isValidIso(exam.date)) return null;
-    return { title: exam.title.slice(0, 80), date: exam.date };
+    return { title: exam.title.slice(0, 80), date: exam.date.slice(0, 10) };
   }
 
   /* ============ Состояние ============ */
@@ -126,16 +142,43 @@
   const prefersDark = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   const state = {
-    loggedIn: Boolean(saved.session),
-    role: saved.session && saved.session.role === 'admin' ? 'admin' : 'student',
+    loggedIn: IS_DEMO && Boolean(saved.session),
+    role: IS_DEMO && saved.session && saved.session.role === 'admin' ? 'admin' : 'student',
     pickedRole: 'student',
-    exam: sanitizeExam(saved.exam) || Object.assign({}, DEFAULT_EXAM),
-    topics: sanitizeTopics(saved.topics) || DEFAULT_TOPICS.map((t) => Object.assign({}, t)),
+    authTab: 'login',
+    user: null,
+    profile: { name: '', email: '', school: '', grade: '' },
+    exam: IS_DEMO ? (sanitizeExam(saved.exam) || Object.assign({}, DEFAULT_EXAM)) : null,
+    topics: IS_DEMO ? (sanitizeTopics(saved.topics) || DEFAULT_TOPICS.map((t) => Object.assign({}, t))) : [],
+    history: [],
+    rating: [],
+    total: 0,
     theme: saved.theme === 'dark' || saved.theme === 'light' ? saved.theme : (prefersDark ? 'dark' : 'light'),
     ratingQuery: '',
     ratingSchool: '',
     chart: null
   };
+
+  function loadDemoData() {
+    state.history = DEMO_HISTORY.map((x) => Object.assign({}, x));
+    state.rating = DEMO_RATING.map((x) => Object.assign({}, x));
+    state.total = DEMO_TOTAL;
+  }
+
+  function resetData() {
+    state.user = null;
+    state.role = 'student';
+    state.profile = { name: '', email: '', school: '', grade: '' };
+    state.exam = null;
+    state.topics = [];
+    state.history = [];
+    state.rating = [];
+    state.total = 0;
+    state.ratingQuery = '';
+    state.ratingSchool = '';
+    const search = $('#ratingSearch');
+    if (search) search.value = '';
+  }
 
   /* ============ Уведомления ============ */
   function toast(message, type = 'info') {
@@ -149,13 +192,34 @@
     setTimeout(() => {
       el.classList.add('hide');
       setTimeout(() => el.remove(), 300);
-    }, 4000);
+    }, 4500);
   }
 
   function persistOrWarn(patch) {
+    if (!IS_DEMO) return;
     if (!writeStore(patch)) {
       toast('Не удалось сохранить: браузер блокирует хранилище (приватный режим?).', 'error');
     }
+  }
+
+  function dbError(error) {
+    const msg = String((error && error.message) || '');
+    if ((error && error.code === '42501') || /row-level security|permission denied/i.test(msg)) {
+      return '❌ Нет прав на это действие.';
+    }
+    if (/fetch|network|failed to/i.test(msg)) return 'Нет связи с сервером. Проверьте интернет.';
+    return 'Ошибка базы данных: ' + (msg || 'неизвестная ошибка');
+  }
+
+  function setBusy(btn, busy, busyLabel) {
+    if (!btn) return;
+    if (busy) {
+      btn.dataset.label = btn.textContent;
+      btn.textContent = busyLabel || '⏳ Подождите…';
+    } else if (btn.dataset.label !== undefined) {
+      btn.textContent = btn.dataset.label;
+    }
+    btn.disabled = busy;
   }
 
   /* ============ Тема ============ */
@@ -171,7 +235,7 @@
     if (state.chart) buildChart();
   }
 
-  /* ============ Вход и роли ============ */
+  /* ============ Окно входа ============ */
   function setPickedRole(role) {
     state.pickedRole = role === 'admin' ? 'admin' : 'student';
     const admin = state.pickedRole === 'admin';
@@ -182,13 +246,41 @@
     $('#loginEmail').value = admin ? 'admin@bil.edu.kz' : 'student@bil.edu.kz';
   }
 
+  function setAuthTab(tab) {
+    state.authTab = tab === 'register' ? 'register' : 'login';
+    const reg = state.authTab === 'register';
+    $('#tabLogin').classList.toggle('active', !reg);
+    $('#tabRegister').classList.toggle('active', reg);
+    $$('.register-only').forEach((el) => { el.hidden = !reg; });
+    $('#authSubmit').textContent = reg ? 'Создать аккаунт' : 'Войти';
+    $('#authPassword').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
+    $('#authDesc').textContent = reg
+      ? 'Создайте аккаунт ученика. Роль администратора выдаёт координатор.'
+      : 'Войдите по email и паролю.';
+    showAuthMessage('', '');
+  }
+
+  function showAuthMessage(kind, text) {
+    const err = $('#authError');
+    const info = $('#authInfo');
+    err.hidden = kind !== 'error' || !text;
+    info.hidden = kind !== 'info' || !text;
+    if (kind === 'error') err.textContent = text;
+    if (kind === 'info') info.textContent = text;
+  }
+
   function openAuth() {
-    setPickedRole(state.role);
-    $('#cancelAuthBtn').hidden = !state.loggedIn;
+    $('#cancelAuthBtn').hidden = !(IS_DEMO && state.loggedIn);
     $('#authModal').classList.add('active');
     $('#reportArea').inert = true;
-    const active = $('.role-btn.active');
-    if (active) active.focus();
+    if (IS_DEMO) {
+      setPickedRole(state.role);
+      const active = $('.role-btn.active');
+      if (active) active.focus();
+    } else if (MODE === 'supabase') {
+      const email = $('#authEmail');
+      if (email) email.focus();
+    }
   }
 
   function closeAuth() {
@@ -196,31 +288,242 @@
     $('#reportArea').inert = false;
   }
 
-  function applySession() {
-    const admin = state.role === 'admin';
-    $('#userRoleTag').textContent = admin ? 'Администратор' : 'Ученик';
-    $('#userEmailTag').textContent = admin ? 'admin@bil.edu.kz' : 'student@bil.edu.kz';
-    $('#welcomeName').textContent = admin ? 'Учитель / Админ' : 'Ученик';
-    $('#adminTabBtn').hidden = !admin;
-    renderRating();
+  function configureForMode() {
+    $('#authDemo').hidden = MODE !== 'demo';
+    $('#authForm').hidden = MODE !== 'supabase';
+    $$('.demo-only').forEach((el) => { el.hidden = !IS_DEMO; });
+    $$('.sb-only').forEach((el) => { el.hidden = IS_DEMO; });
+
+    const label = $('.logout-label');
+    const logout = $('#logoutBtn');
+    if (IS_DEMO) {
+      label.textContent = 'Сменить аккаунт';
+      logout.setAttribute('aria-label', 'Сменить аккаунт');
+      $('#authTitle').textContent = '🔐 Авторизация BIL Analytics';
+    } else {
+      label.textContent = 'Выйти';
+      logout.setAttribute('aria-label', 'Выйти из аккаунта');
+      $('#authTitle').textContent = '🔐 Вход в BIL Analytics';
+      $('#ratingHint').textContent = 'Рейтинг строится по последнему результату БТС среди зарегистрированных учеников.';
+    }
+
+    if (MODE === 'broken') {
+      $('#authDesc').textContent = '⚠️ Не удалось загрузить библиотеку Supabase. Проверьте интернет и обновите страницу.';
+    } else if (MODE === 'supabase') {
+      setAuthTab('login');
+    }
   }
 
-  function login() {
-    state.role = state.pickedRole;
-    state.loggedIn = true;
-    writeStore({ session: { role: state.role } });
-    closeAuth();
-    applySession();
-    switchTab(state.role === 'admin' ? 'admin' : 'dashboard');
-    toast(state.role === 'admin' ? 'Вы вошли как администратор' : 'Вы вошли как ученик', 'success');
-  }
-
+  /* ============ Роли и права ============ */
   function requireAdmin() {
     if (state.role !== 'admin') {
       toast('❌ Нет доступа: это действие только для администрации БИЛ.', 'error');
       return false;
     }
     return true;
+  }
+
+  function applyDemoSession() {
+    const admin = state.role === 'admin';
+    state.profile = {
+      name: admin ? 'Учитель / Админ' : 'Ученик',
+      email: admin ? 'admin@bil.edu.kz' : 'student@bil.edu.kz',
+      school: 'BIL / КТЛ',
+      grade: '10'
+    };
+    renderAll();
+  }
+
+  function loginDemo() {
+    state.role = state.pickedRole;
+    state.loggedIn = true;
+    writeStore({ session: { role: state.role } });
+    closeAuth();
+    applyDemoSession();
+    switchTab(state.role === 'admin' ? 'admin' : 'dashboard');
+    toast(state.role === 'admin' ? 'Вы вошли как администратор' : 'Вы вошли как ученик', 'success');
+  }
+
+  /* ============ Supabase: вход, регистрация, загрузка данных ============ */
+  function authMessage(err) {
+    const m = String((err && err.message) || '').toLowerCase();
+    if (m.includes('invalid login')) return 'Неверный email или пароль.';
+    if (m.includes('email not confirmed')) return 'Email не подтверждён. Откройте письмо со ссылкой и попробуйте снова.';
+    if (m.includes('already registered') || m.includes('already been registered')) return 'Этот email уже зарегистрирован. Попробуйте войти.';
+    if (m.includes('rate limit') || m.includes('too many')) return 'Слишком много попыток. Подождите немного и повторите.';
+    if (m.includes('password')) return 'Пароль не подошёл: используйте минимум 8 символов.';
+    if (m.includes('fetch') || m.includes('network')) return 'Нет связи с сервером. Проверьте интернет.';
+    return 'Не получилось: ' + ((err && err.message) || 'неизвестная ошибка');
+  }
+
+  const unwrap = (res) => {
+    if (res.error) throw res.error;
+    return res.data;
+  };
+
+  async function loadSupabaseData(user) {
+    const [profRes, examRes, topicsRes, scoresRes, resultsRes, boardRes] = await Promise.all([
+      sb.from('profiles').select('full_name,email,school,grade,role').eq('id', user.id).maybeSingle(),
+      sb.from('exam_settings').select('title,exam_date').eq('id', 1).maybeSingle(),
+      sb.from('topics').select('id,subject,topic,recommendation').order('id', { ascending: true }),
+      sb.from('topic_scores').select('topic_id,score').eq('student_id', user.id),
+      sb.from('bts_results').select('exam_name,score,taken_on').eq('student_id', user.id).order('taken_on', { ascending: true }),
+      sb.rpc('get_leaderboard')
+    ]);
+
+    const prof = unwrap(profRes);
+    if (!prof) throw new Error('Профиль не найден. Выполните supabase.sql и зарегистрируйтесь заново.');
+    const exam = unwrap(examRes);
+    const topics = unwrap(topicsRes) || [];
+    const scores = unwrap(scoresRes) || [];
+    const results = unwrap(resultsRes) || [];
+    const board = unwrap(boardRes) || [];
+
+    const scoreMap = new Map(scores.map((s) => [String(s.topic_id), Number(s.score)]));
+
+    state.user = user;
+    state.role = prof.role === 'admin' ? 'admin' : 'student';
+    state.profile = {
+      name: prof.full_name || prof.email || user.email || '',
+      email: prof.email || user.email || '',
+      school: prof.school || '',
+      grade: prof.grade == null ? '' : String(prof.grade)
+    };
+    state.exam = exam && isValidIso(String(exam.exam_date)) ? { title: String(exam.title), date: String(exam.exam_date).slice(0, 10) } : null;
+    state.topics = topics.map((t) => ({
+      id: t.id,
+      subject: String(t.subject),
+      topic: String(t.topic),
+      recommendation: String(t.recommendation || ''),
+      score: scoreMap.has(String(t.id)) ? scoreMap.get(String(t.id)) : null
+    }));
+    state.history = results.map((r) => ({ name: String(r.exam_name), score: Number(r.score) }));
+    state.rating = board.map((r) => ({
+      rank: Number(r.place),
+      name: String(r.display_name || ''),
+      school: String(r.school || ''),
+      score: Number(r.score),
+      me: Boolean(r.is_me)
+    }));
+    state.total = state.rating.length;
+  }
+
+  async function enterApp(user, fromSession) {
+    try {
+      await loadSupabaseData(user);
+    } catch (err) {
+      try { await sb.auth.signOut(); } catch (e) { /* игнорируем */ }
+      resetData();
+      renderAll();
+      openAuth();
+      showAuthMessage('error', 'Не удалось загрузить данные: ' + ((err && err.message) || 'ошибка'));
+      return false;
+    }
+    state.loggedIn = true;
+    closeAuth();
+    renderAll();
+    const hash = location.hash.slice(1);
+    const wanted = fromSession && TAB_IDS.includes(hash) ? hash : (state.role === 'admin' ? 'admin' : 'dashboard');
+    switchTab(wanted, { silent: Boolean(fromSession) });
+    if (!fromSession) toast(state.role === 'admin' ? 'Вы вошли как администратор' : 'Добро пожаловать!', 'success');
+    return true;
+  }
+
+  async function onAuthSubmit(e) {
+    e.preventDefault();
+    showAuthMessage('', '');
+
+    const email = $('#authEmail').value.trim();
+    const password = $('#authPassword').value;
+    const register = state.authTab === 'register';
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) return showAuthMessage('error', 'Введите корректный email.');
+    if (register && password.length < 8) return showAuthMessage('error', 'Пароль должен быть не короче 8 символов.');
+    if (!register && !password) return showAuthMessage('error', 'Введите пароль.');
+
+    let meta = null;
+    if (register) {
+      const fullName = $('#regName').value.trim();
+      const school = $('#regSchool').value.trim();
+      const grade = Number($('#regGrade').value);
+      if (fullName.length < 2) return showAuthMessage('error', 'Укажите имя и фамилию.');
+      if (!school) return showAuthMessage('error', 'Укажите лицей.');
+      if (!Number.isInteger(grade) || grade < 1 || grade > 12) return showAuthMessage('error', 'Класс — число от 1 до 12.');
+      meta = { full_name: fullName, school, grade };
+    }
+
+    const btn = $('#authSubmit');
+    setBusy(btn, true, '⏳ Подождите…');
+    try {
+      if (register) {
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: meta } });
+        if (error) return showAuthMessage('error', authMessage(error));
+        if (data && data.session) {
+          await enterApp(data.session.user || data.user, false);
+        } else {
+          setAuthTab('login');
+          $('#authEmail').value = email;
+          $('#authPassword').value = '';
+          showAuthMessage('info', `Мы отправили письмо на ${email}. Подтвердите email по ссылке, затем войдите.`);
+        }
+      } else {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) return showAuthMessage('error', authMessage(error));
+        $('#authPassword').value = '';
+        await enterApp(data.user || (data.session && data.session.user), false);
+      }
+    } catch (err) {
+      showAuthMessage('error', authMessage(err));
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  function afterSignOut() {
+    state.loggedIn = false;
+    resetData();
+    renderAll();
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* не критично */ }
+    switchTab('dashboard', { silent: true });
+    if (MODE === 'supabase') {
+      $('#authPassword').value = '';
+      setAuthTab('login');
+    }
+    openAuth();
+  }
+
+  async function logout() {
+    if (IS_DEMO) return openAuth();
+    try {
+      await sb.auth.signOut();
+    } catch (e) {
+      toast('Не удалось выйти: ' + ((e && e.message) || 'ошибка'), 'error');
+    }
+    if (state.loggedIn) afterSignOut();
+  }
+
+  async function bootSupabase() {
+    $('#authForm').hidden = true;
+    $('#authDesc').textContent = 'Проверяем вход…';
+
+    sb.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' && state.loggedIn) afterSignOut();
+    });
+
+    let user = null;
+    try {
+      const { data } = await sb.auth.getSession();
+      user = data && data.session ? data.session.user : null;
+    } catch (e) { /* считаем, что не вошли */ }
+
+    $('#authForm').hidden = false;
+    setAuthTab('login');
+    if (user) {
+      const ok = await enterApp(user, true);
+      if (ok) return;
+    } else {
+      openAuth();
+    }
   }
 
   /* ============ Вкладки ============ */
@@ -242,54 +545,110 @@
   }
 
   /* ============ Расчёты ============ */
+  const myRow = () => state.rating.find((r) => r.me) || null;
+
   function topPercent() {
-    const me = RATING.find((r) => r.me);
-    return Math.max(1, Math.ceil((me.rank / TOTAL_STUDENTS) * 100));
+    const me = myRow();
+    if (!me || !state.total) return null;
+    return Math.max(1, Math.ceil((me.rank / state.total) * 100));
   }
 
   const levelOf = (score) => (score < 50 ? 'danger' : score < 70 ? 'warning' : 'success');
+  const scoredTopics = () => state.topics.filter((t) => t.score != null);
 
   /* ============ Отрисовка ============ */
+  function renderProfile() {
+    const admin = state.role === 'admin';
+    $('#userRoleTag').textContent = admin ? 'Администратор' : 'Ученик';
+    $('#userEmailTag').textContent = state.profile.email || '—';
+    $('#welcomeName').textContent = state.profile.name || 'Ученик';
+    $('#profSchool').textContent = state.profile.school || '—';
+    $('#profGrade').textContent = state.profile.grade || '—';
+    $('#adminTabBtn').hidden = !admin;
+  }
+
   function renderExam() {
-    $('#nextExamTitle').textContent = state.exam.title;
-    $('#nextExamDate').textContent = formatDateRu(state.exam.date);
+    if (state.exam) {
+      $('#nextExamTitle').textContent = state.exam.title;
+      $('#nextExamDate').textContent = formatDateRu(state.exam.date);
+    } else {
+      $('#nextExamTitle').textContent = 'пока не назначен';
+      $('#nextExamDate').textContent = '—';
+    }
   }
 
   function renderStats() {
-    const last = BTS_HISTORY[BTS_HISTORY.length - 1];
-    const prev = BTS_HISTORY[BTS_HISTORY.length - 2];
-    const avg = BTS_HISTORY.reduce((s, x) => s + x.score, 0) / BTS_HISTORY.length;
-    const me = RATING.find((r) => r.me);
+    const h = state.history;
+    const me = myRow();
     const top = topPercent();
 
-    $('#displayRank').innerHTML = `#${me.rank} <span>из ${TOTAL_STUDENTS.toLocaleString('ru-RU')} учеников</span>`;
-    $('#latestScore').innerHTML = `${num(last.score)} <span>/ 100</span>`;
+    $('#displayRank').innerHTML = me
+      ? `#${me.rank} <span>из ${state.total.toLocaleString('ru-RU')} ${plural(state.total, 'ученик', 'ученика', 'учеников')}</span>`
+      : '—';
 
     const delta = $('#scoreDelta');
-    if (prev) {
-      const diff = last.score - prev.score;
-      delta.className = 'stat-sub ' + (diff >= 0 ? 'up' : 'down');
-      delta.textContent = `${diff >= 0 ? '▲ +' : '▼ −'}${num(Math.abs(diff))} к ${prev.name}`;
-    }
-    $('#avgScore').textContent = `Средний за все БТС: ${num(avg)}`;
+    const avgEl = $('#avgScore');
+    delta.className = 'stat-sub';
+    delta.textContent = '';
 
-    $('#kboStatus').textContent = top <= 5 ? 'Топер' : top <= 25 ? 'Сильный уровень' : 'В пути к вершине';
-    $('#kboSub').textContent = `Топ-${top}% учеников БИЛ`;
+    if (h.length) {
+      const last = h[h.length - 1];
+      $('#latestScore').innerHTML = `${num(last.score)} <span>/ 100</span>`;
+      if (h.length > 1) {
+        const prev = h[h.length - 2];
+        const diff = last.score - prev.score;
+        delta.className = 'stat-sub ' + (diff >= 0 ? 'up' : 'down');
+        delta.textContent = `${diff >= 0 ? '▲ +' : '▼ −'}${num(Math.abs(diff))} к ${prev.name}`;
+        const avg = h.reduce((s, x) => s + x.score, 0) / h.length;
+        avgEl.textContent = `Средний за все БТС: ${num(avg)}`;
+      } else {
+        avgEl.textContent = '';
+      }
+    } else {
+      $('#latestScore').textContent = '—';
+      avgEl.textContent = 'Пока нет результатов БТС';
+    }
+
+    if (top == null) {
+      $('#kboStatus').textContent = 'Нет данных';
+      $('#kboSub').textContent = 'Появится после первого результата';
+    } else {
+      $('#kboStatus').textContent = top <= 5 ? 'Топер' : top <= 25 ? 'Сильный уровень' : 'В пути к вершине';
+      $('#kboSub').textContent = `Топ-${top}% учеников БИЛ`;
+    }
   }
 
   function renderBadges() {
-    const first = BTS_HISTORY[0];
-    const last = BTS_HISTORY[BTS_HISTORY.length - 1];
-    const best = Math.max(...BTS_HISTORY.map((x) => x.score));
+    const h = state.history;
+    const first = h[0];
+    const last = h[h.length - 1];
+    const best = h.length ? Math.max(...h.map((x) => x.score)) : 0;
     const top = topPercent();
-    const lowCount = state.topics.filter((t) => t.score < 50).length;
-    const diff = last.score - first.score;
+    const scored = scoredTopics();
+    const lowCount = scored.filter((t) => t.score < 50).length;
+    const diff = h.length > 1 ? last.score - first.score : 0;
 
     const items = [
-      { ico: '🚀', title: 'Рост результата', desc: `${diff >= 0 ? '+' : '−'}${num(Math.abs(diff))} б. с ${first.name}`, ok: last.score > first.score },
-      { ico: '🏆', title: 'Топ-5%', desc: `Сейчас топ-${top}%`, ok: top <= 5 },
-      { ico: '🎯', title: '90+ баллов', desc: best >= 90 ? `Лучший: ${num(best)}` : `Не хватает ${num(90 - best)} б.`, ok: best >= 90 },
-      { ico: '📚', title: 'Нет красных зон', desc: lowCount === 0 ? 'Все темы от 50%' : `Ниже 50%: ${lowCount} ${plural(lowCount, 'тема', 'темы', 'тем')}`, ok: state.topics.length > 0 && lowCount === 0 }
+      {
+        ico: '🚀', title: 'Рост результата',
+        desc: h.length > 1 ? `${diff >= 0 ? '+' : '−'}${num(Math.abs(diff))} б. с ${first.name}` : 'Нужно 2 результата',
+        ok: h.length > 1 && last.score > first.score
+      },
+      {
+        ico: '🏆', title: 'Топ-5%',
+        desc: top == null ? 'Нет данных' : `Сейчас топ-${top}%`,
+        ok: top != null && top <= 5
+      },
+      {
+        ico: '🎯', title: '90+ баллов',
+        desc: !h.length ? 'Нет результатов' : best >= 90 ? `Лучший: ${num(best)}` : `Не хватает ${num(90 - best)} б.`,
+        ok: best >= 90
+      },
+      {
+        ico: '📚', title: 'Нет красных зон',
+        desc: !scored.length ? 'Нет данных по темам' : lowCount === 0 ? 'Все темы от 50%' : `Ниже 50%: ${lowCount} ${plural(lowCount, 'тема', 'темы', 'тем')}`,
+        ok: scored.length > 0 && lowCount === 0
+      }
     ];
 
     $('#badgesGrid').innerHTML = items.map((b) => `
@@ -304,11 +663,11 @@
   function renderTopics() {
     const list = $('#weakTopicsList');
     const advice = $('#aiRecommendations');
-    const sorted = state.topics.slice().sort((a, b) => a.score - b.score);
+    const sorted = scoredTopics().sort((a, b) => a.score - b.score);
 
     if (!sorted.length) {
-      list.innerHTML = '<li class="empty">Темы пока не добавлены.</li>';
-      advice.innerHTML = '<li class="empty">Рекомендаций пока нет.</li>';
+      list.innerHTML = '<li class="empty">Данных по темам пока нет.</li>';
+      advice.innerHTML = '<li class="empty">Рекомендации появятся, когда будут оценки по темам.</li>';
       return;
     }
 
@@ -329,13 +688,18 @@
 
     advice.innerHTML = sorted.filter((t) => t.recommendation).map((t) => `
       <li class="advice-item level-${levelOf(t.score)}"><strong>${esc(t.subject)}:</strong> ${esc(t.recommendation)}</li>`
-    ).join('');
+    ).join('') || '<li class="empty">Рекомендаций пока нет.</li>';
   }
 
   function renderHistory() {
-    const best = Math.max(...BTS_HISTORY.map((x) => x.score));
-    $('#historyList').innerHTML = BTS_HISTORY.map((x, i) => {
-      const prev = BTS_HISTORY[i - 1];
+    const h = state.history;
+    if (!h.length) {
+      $('#historyList').innerHTML = '<li class="empty">Результатов БТС / КБО пока нет.</li>';
+      return;
+    }
+    const best = Math.max(...h.map((x) => x.score));
+    $('#historyList').innerHTML = h.map((x, i) => {
+      const prev = h[i - 1];
       let delta = '';
       if (prev) {
         const diff = x.score - prev.score;
@@ -344,7 +708,7 @@
       return `
         <li class="history-item level-${levelOf(x.score)}">
           <div class="history-top">
-            <span class="history-name">${esc(x.name)}${x.score === best ? ' <span class="tag tag-best">Лучший результат</span>' : ''}</span>
+            <span class="history-name">${esc(x.name)}${x.score === best && h.length > 1 ? ' <span class="tag tag-best">Лучший результат</span>' : ''}</span>
             <span><span class="history-score">${num(x.score)}/100</span>${delta}</span>
           </div>
           <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${x.score}" aria-label="${esc(x.name)}: ${num(x.score)} из 100">
@@ -356,43 +720,51 @@
 
   function renderRating() {
     const q = state.ratingQuery.trim().toLowerCase();
-    const rows = RATING.filter((r) =>
+    const rows = state.rating.filter((r) =>
       (!state.ratingSchool || r.school === state.ratingSchool) &&
       (!q || r.name.toLowerCase().includes(q) || r.school.toLowerCase().includes(q))
     );
     const medal = { 1: '🥇', 2: '🥈', 3: '🥉' };
-    const meName = state.role === 'admin' ? 'Демо-ученик' : 'Вы';
+
+    const nameOf = (r) => {
+      if (!r.me) return r.name;
+      if (IS_DEMO) return state.role === 'admin' ? 'Демо-ученик' : 'Вы';
+      return `${r.name} (вы)`;
+    };
 
     $('#ratingTableBody').innerHTML = rows.length
       ? rows.map((r) => `
         <tr class="${r.me ? 'me' : ''}">
           <td>${medal[r.rank] ? medal[r.rank] + ' ' : ''}#${r.rank}</td>
-          <td>${esc(r.me ? meName : r.name)}</td>
-          <td>${esc(r.school)}</td>
+          <td>${esc(nameOf(r))}</td>
+          <td>${esc(r.school || '—')}</td>
           <td>${num(r.score)}</td>
         </tr>`).join('')
-      : '<tr><td colspan="4" class="empty">Ничего не найдено</td></tr>';
+      : `<tr><td colspan="4" class="empty">${state.rating.length ? 'Ничего не найдено' : 'Рейтинг пока пуст'}</td></tr>`;
 
-    $('#ratingCount').textContent = `Показано: ${rows.length} из ${RATING.length}`;
+    $('#ratingCount').textContent = `Показано: ${rows.length} из ${state.rating.length}`;
   }
 
   function fillSchoolFilter() {
-    const schools = Array.from(new Set(RATING.map((r) => r.school))).sort((a, b) => a.localeCompare(b, 'ru'));
-    $('#ratingSchool').innerHTML = '<option value="">Все лицеи</option>' +
+    const sel = $('#ratingSchool');
+    const schools = Array.from(new Set(state.rating.map((r) => r.school).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ru'));
+    sel.innerHTML = '<option value="">Все лицеи</option>' +
       schools.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    if (schools.includes(state.ratingSchool)) sel.value = state.ratingSchool;
+    else state.ratingSchool = '';
   }
 
   function renderAdminTopics() {
     const ul = $('#adminTopicsList');
     if (!state.topics.length) {
-      ul.innerHTML = '<li class="empty">Список пуст. Добавьте тему или сбросьте к исходным.</li>';
+      ul.innerHTML = '<li class="empty">Список пуст. Добавьте тему' + (IS_DEMO ? ' или сбросьте к исходным.' : '.') + '</li>';
       return;
     }
     ul.innerHTML = state.topics.map((t) => `
-      <li class="level-${levelOf(t.score)}">
+      <li class="${t.score != null ? 'level-' + levelOf(t.score) : ''}">
         <span class="tag">${esc(t.subject)}</span>
         <span class="topic-name">${esc(t.topic)}</span>
-        <span class="score-pill">${t.score}%</span>
+        ${t.score != null ? `<span class="score-pill">${t.score}%</span>` : ''}
         <button type="button" class="icon-btn" data-del="${esc(t.id)}" aria-label="Удалить тему: ${esc(t.topic)}">🗑</button>
       </li>`).join('');
   }
@@ -403,19 +775,39 @@
     renderAdminTopics();
   }
 
+  function renderAll() {
+    renderProfile();
+    renderExam();
+    renderStats();
+    renderHistory();
+    fillSchoolFilter();
+    renderRating();
+    renderTopicViews();
+    buildChart();
+    tickCountdown();
+  }
+
   function prefillAdmin() {
-    $('#adminExamTitle').value = state.exam.title;
-    $('#adminExamDate').value = state.exam.date;
+    $('#adminExamTitle').value = state.exam ? state.exam.title : '';
+    $('#adminExamDate').value = state.exam ? state.exam.date : '';
     $('#adminExamDate').min = todayIso();
   }
 
   /* ============ Таймер до экзамена ============ */
   function tickCountdown() {
+    const units = $('#timerUnits');
+    const done = $('#timerDone');
+
+    if (!state.exam) {
+      units.hidden = true;
+      done.hidden = false;
+      done.textContent = 'Дата пока не назначена';
+      return;
+    }
+
     const target = parseLocalDate(state.exam.date).getTime();
     const now = Date.now();
     const diff = target - now;
-    const units = $('#timerUnits');
-    const done = $('#timerDone');
 
     if (diff <= 0) {
       units.hidden = true;
@@ -445,7 +837,17 @@
     const note = $('#chartNote');
     if (!canvas) return;
 
-    const summary = BTS_HISTORY.map((x) => `${x.name}: ${num(x.score)}`).join(', ');
+    if (state.chart) { state.chart.destroy(); state.chart = null; }
+
+    const h = state.history;
+    if (!h.length) {
+      canvas.hidden = true;
+      note.hidden = false;
+      note.textContent = 'График появится после первого результата БТС.';
+      return;
+    }
+
+    const summary = h.map((x) => `${x.name}: ${num(x.score)}`).join(', ');
     canvas.setAttribute('aria-label', `График результатов БТС. ${summary}.`);
 
     if (typeof Chart === 'undefined') {
@@ -457,7 +859,6 @@
 
     canvas.hidden = false;
     note.hidden = true;
-    if (state.chart) state.chart.destroy();
 
     const css = getComputedStyle(document.documentElement);
     const primary = css.getPropertyValue('--primary').trim() || '#4f46e5';
@@ -467,10 +868,10 @@
     state.chart = new Chart(canvas.getContext('2d'), {
       type: 'line',
       data: {
-        labels: BTS_HISTORY.map((x) => x.name),
+        labels: h.map((x) => x.name),
         datasets: [{
           label: 'Балл БТС',
-          data: BTS_HISTORY.map((x) => x.score),
+          data: h.map((x) => x.score),
           borderColor: primary,
           backgroundColor: 'rgba(79, 70, 229, 0.15)',
           pointBackgroundColor: primary,
@@ -527,7 +928,7 @@
   }
 
   /* ============ Действия администратора ============ */
-  function onExamSubmit(e) {
+  async function onExamSubmit(e) {
     e.preventDefault();
     if (!requireAdmin()) return;
 
@@ -538,17 +939,35 @@
     if (!isValidIso(date)) return toast('Выберите дату проведения.', 'error');
     if (date < todayIso()) return toast('Эта дата уже прошла. Выберите сегодняшний или будущий день.', 'error');
 
-    state.exam = { title: title.slice(0, 80), date };
+    const next = { title: title.slice(0, 80), date };
+
+    if (!IS_DEMO) {
+      const btn = e.submitter || $('#examForm button[type=submit]');
+      setBusy(btn, true, '⏳ Сохраняю…');
+      try {
+        const { error } = await sb.from('exam_settings').upsert({
+          id: 1, title: next.title, exam_date: next.date, updated_at: new Date().toISOString()
+        });
+        if (error) return toast(dbError(error), 'error');
+      } catch (err) {
+        return toast(dbError(err), 'error');
+      } finally {
+        setBusy(btn, false);
+      }
+    }
+
+    state.exam = next;
     persistOrWarn({ exam: state.exam });
     renderExam();
     tickCountdown();
-    toast('✅ Дата экзамена сохранена в этом браузере.', 'success');
+    toast(IS_DEMO ? '✅ Дата экзамена сохранена в этом браузере.' : '✅ Дата экзамена опубликована для всех учеников.', 'success');
   }
 
-  function onTopicSubmit(e) {
+  async function onTopicSubmit(e) {
     e.preventDefault();
     if (!requireAdmin()) return;
 
+    const form = e.target;
     const subject = $('#newSubjectInput').value.trim();
     const topic = $('#newTopicInput').value.trim();
     const scoreRaw = $('#newScoreInput').value.trim();
@@ -556,33 +975,66 @@
     const score = scoreRaw === '' ? 50 : Number(scoreRaw);
 
     if (!subject || !topic) return toast('Заполните предмет и тему.', 'error');
-    if (!Number.isFinite(score) || score < 0 || score > 100) return toast('Освоение — число от 0 до 100.', 'error');
+    if (IS_DEMO && (!Number.isFinite(score) || score < 0 || score > 100)) return toast('Освоение — число от 0 до 100.', 'error');
 
-    state.topics.push({
+    const item = {
       id: uid(),
       subject: subject.slice(0, 60),
       topic: topic.slice(0, 120),
-      score: Math.round(score),
-      recommendation: (rec || 'Новая тема, добавленная администратором БИЛ.').slice(0, 200)
-    });
+      score: IS_DEMO ? Math.round(score) : null,
+      recommendation: (rec || (IS_DEMO ? 'Новая тема, добавленная администратором БИЛ.' : '')).slice(0, 200)
+    };
+
+    if (!IS_DEMO) {
+      const btn = e.submitter || $('#topicForm button[type=submit]');
+      setBusy(btn, true, '⏳ Добавляю…');
+      try {
+        const { data, error } = await sb.from('topics')
+          .insert({ subject: item.subject, topic: item.topic, recommendation: item.recommendation })
+          .select('id')
+          .single();
+        if (error) return toast(dbError(error), 'error');
+        item.id = data.id;
+      } catch (err) {
+        return toast(dbError(err), 'error');
+      } finally {
+        setBusy(btn, false);
+      }
+    }
+
+    state.topics.push(item);
     persistOrWarn({ topics: state.topics });
     renderTopicViews();
-    e.target.reset();
+    form.reset();
     toast('✅ Тема добавлена.', 'success');
   }
 
-  function onAdminTopicsClick(e) {
+  async function onAdminTopicsClick(e) {
     const btn = e.target.closest('[data-del]');
     if (!btn) return;
     if (!requireAdmin()) return;
-    state.topics = state.topics.filter((t) => t.id !== btn.dataset.del);
+    const id = btn.dataset.del;
+
+    if (!IS_DEMO) {
+      btn.disabled = true;
+      try {
+        const { data, error } = await sb.from('topics').delete().eq('id', id).select('id');
+        if (error) { btn.disabled = false; return toast(dbError(error), 'error'); }
+        if (!data || !data.length) { btn.disabled = false; return toast('Не удалось удалить: нет прав или тема уже удалена.', 'error'); }
+      } catch (err) {
+        btn.disabled = false;
+        return toast(dbError(err), 'error');
+      }
+    }
+
+    state.topics = state.topics.filter((t) => String(t.id) !== String(id));
     persistOrWarn({ topics: state.topics });
     renderTopicViews();
-    toast('Тема удалена. Всё можно вернуть кнопкой «Сбросить к исходным».');
+    toast(IS_DEMO ? 'Тема удалена. Всё можно вернуть кнопкой «Сбросить к исходным».' : 'Тема удалена.');
   }
 
   function onReset() {
-    if (!requireAdmin()) return;
+    if (!IS_DEMO || !requireAdmin()) return;
     if (!window.confirm('Вернуть дату экзамена и список тем к исходным значениям?')) return;
     state.exam = Object.assign({}, DEFAULT_EXAM);
     state.topics = DEFAULT_TOPICS.map((t) => Object.assign({}, t));
@@ -596,10 +1048,12 @@
 
   /* ============ События ============ */
   function bindEvents() {
-    $$('.role-btn').forEach((b) => b.addEventListener('click', () => setPickedRole(b.dataset.role)));
-    $('#loginBtn').addEventListener('click', login);
+    $$('.role-btn[data-role]').forEach((b) => b.addEventListener('click', () => setPickedRole(b.dataset.role)));
+    $$('.role-btn[data-auth-tab]').forEach((b) => b.addEventListener('click', () => setAuthTab(b.dataset.authTab)));
+    $('#loginBtn').addEventListener('click', loginDemo);
+    $('#authForm').addEventListener('submit', onAuthSubmit);
     $('#cancelAuthBtn').addEventListener('click', closeAuth);
-    $('#logoutBtn').addEventListener('click', openAuth);
+    $('#logoutBtn').addEventListener('click', logout);
     $('#themeBtn').addEventListener('click', () => applyTheme(state.theme === 'dark' ? 'light' : 'dark', true));
     $$('.nav-btn').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
     $('#pdfBtn').addEventListener('click', exportPDF);
@@ -613,32 +1067,34 @@
     $('#ratingSchool').addEventListener('change', (e) => { state.ratingSchool = e.target.value; renderRating(); });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && state.loggedIn && $('#authModal').classList.contains('active')) closeAuth();
+      if (e.key === 'Escape' && IS_DEMO && state.loggedIn && $('#authModal').classList.contains('active')) closeAuth();
     });
   }
 
   /* ============ Запуск ============ */
   function init() {
     applyTheme(state.theme, false);
-    fillSchoolFilter();
+    configureForMode();
     bindEvents();
-
-    renderExam();
-    renderStats();
-    renderHistory();
-    renderRating();
-    renderTopicViews();
-    buildChart();
-
-    tickCountdown();
     setInterval(tickCountdown, 1000);
 
-    if (state.loggedIn) {
-      closeAuth();
-    } else {
-      openAuth();
+    if (MODE === 'supabase') {
+      renderAll();
+      bootSupabase();
+      return;
     }
-    applySession();
+
+    if (MODE === 'broken') {
+      renderAll();
+      openAuth();
+      return;
+    }
+
+    // Демо-режим
+    loadDemoData();
+    applyDemoSession();
+    if (state.loggedIn) closeAuth();
+    else openAuth();
 
     const hash = location.hash.slice(1);
     switchTab(TAB_IDS.includes(hash) ? hash : 'dashboard', { silent: true });
