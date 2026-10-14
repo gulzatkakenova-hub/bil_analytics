@@ -7,12 +7,49 @@
   const SB_KEY = String(CFG.SUPABASE_ANON_KEY || '').trim();
 
   let MODE = 'demo'; // 'demo' | 'supabase' | 'broken'
+  let BROKEN_MSG = '';
   let sb = null;
+
+  // Проверка config.js: понятные подсказки вместо загадочных ошибок
+  function jwtRole(token) {
+    try {
+      const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(part)).role || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function checkConfig() {
+    if (!/^https:\/\/[a-z0-9-]+\.[a-z0-9.-]+\/?$/i.test(SB_URL)) {
+      const looksLikeKey = /^(sb_|eyJ)/.test(SB_URL);
+      return '⚠️ В config.js в поле SUPABASE_URL ' + (looksLikeKey ? 'указан ключ, а нужен адрес проекта' : 'неверный адрес') +
+        ' вида https://xxxxxxxx.supabase.co (Supabase → Project Settings → API → Project URL).';
+    }
+    if (/^https?:\/\//i.test(SB_KEY)) {
+      return '⚠️ В config.js в поле SUPABASE_ANON_KEY указан адрес, а нужен ключ (Publishable key или anon public).';
+    }
+    if (/^sb_secret_/.test(SB_KEY) || jwtRole(SB_KEY) === 'service_role') {
+      return '⚠️ В config.js указан СЕКРЕТНЫЙ ключ. Он не должен быть на сайте: замените его на Publishable key или anon public.';
+    }
+    return '';
+  }
+
   if (SB_URL && SB_KEY) {
-    if (window.supabase && typeof window.supabase.createClient === 'function') {
-      try { sb = window.supabase.createClient(SB_URL, SB_KEY); MODE = 'supabase'; } catch (e) { MODE = 'broken'; }
+    BROKEN_MSG = checkConfig();
+    if (BROKEN_MSG) {
+      MODE = 'broken';
+    } else if (window.supabase && typeof window.supabase.createClient === 'function') {
+      try {
+        sb = window.supabase.createClient(SB_URL, SB_KEY);
+        MODE = 'supabase';
+      } catch (e) {
+        MODE = 'broken';
+        BROKEN_MSG = '⚠️ Не удалось подключиться к Supabase: проверьте SUPABASE_URL и ключ в config.js.';
+      }
     } else {
       MODE = 'broken';
+      BROKEN_MSG = '⚠️ Не удалось загрузить библиотеку Supabase. Проверьте интернет, отключите блокировщик рекламы и обновите страницу (Ctrl+F5).';
     }
   }
   const IS_DEMO = MODE === 'demo';
@@ -311,7 +348,7 @@
     }
 
     if (MODE === 'broken') {
-      $('#authDesc').textContent = '⚠️ Не удалось загрузить библиотеку Supabase. Проверьте интернет, отключите блокировщик рекламы и обновите страницу (Ctrl+F5).';
+      $('#authDesc').textContent = BROKEN_MSG;
     } else if (MODE === 'supabase') {
       setAuthTab('login');
     }
