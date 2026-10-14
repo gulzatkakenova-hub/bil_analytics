@@ -16,12 +16,8 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css">
 
-  <!-- Скрипты с defer выполняются по порядку после загрузки страницы -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" defer></script>
-  <script src="config.js" defer></script>
-  <script src="script.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Перейти к содержимому</a>
@@ -278,5 +274,50 @@
   </div>
 
   <div class="toast-container" id="toasts" role="status" aria-live="polite"></div>
+  <!-- Загрузка Supabase с запасными адресами, затем config.js и script.js -->
+  <script>
+    (function () {
+      var LIBS = [
+        'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js',
+        'https://unpkg.com/@supabase/supabase-js@2.58.0/dist/umd/supabase.js',
+        'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
+        'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'
+      ];
+
+      function load(src, cb) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = function () { cb(true); };
+        s.onerror = function () { s.parentNode && s.parentNode.removeChild(s); cb(false); };
+        document.head.appendChild(s);
+      }
+
+      function libReady() {
+        return window.supabase && typeof window.supabase.createClient === 'function';
+      }
+
+      function tryLib(i, done) {
+        if (i >= LIBS.length) return done();
+        load(LIBS[i], function (ok) {
+          if (ok && libReady()) return done();
+          if (window.console) console.warn('Supabase не загрузился с адреса:', LIBS[i]);
+          tryLib(i + 1, done);
+        });
+      }
+
+      function start() {
+        load('config.js', function () {
+          var c = window.BIL_CONFIG || {};
+          var go = function () { load('script.js', function () {}); };
+          // Библиотека нужна, только если в config.js вписаны ключи
+          if (c.SUPABASE_URL && c.SUPABASE_ANON_KEY) tryLib(0, go); else go();
+        });
+      }
+
+      // Запускаем после выполнения Chart.js и html2pdf (они подключены в <head> с defer)
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    })();
+  </script>
 </body>
 </html>
